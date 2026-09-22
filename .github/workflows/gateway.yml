@@ -1,0 +1,70 @@
+name: Gateway (24/7 bot)
+
+# Self-chaining long-poller: each run polls Telegram getUpdates for up to
+# ~5h45m, then dispatches the NEXT run with the current update offset, so the
+# bot is online around the clock on free public-repo minutes. The watchdog
+# (watchdog.yml) restarts the chain if a link ever breaks.
+
+on:
+  workflow_dispatch:
+    inputs:
+      offset:
+        description: "getUpdates offset to resume from (-1 = skip old)"
+        required: false
+        default: "-1"
+      runtime_minutes:
+        description: "how long this instance polls (tests: 3)"
+        required: false
+        default: "345"
+
+permissions:
+  actions: write
+
+concurrency:
+  group: gateway-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run gateway
+        id: gw
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHECKER_TOKENS: ${{ secrets.BOT_TOKEN }},${{ secrets.CHECKER_TOKEN }}
+          GATE_CHAT_ID: ${{ secrets.GATE_CHAT_ID }}
+          APP_URL: ${{ secrets.APP_URL }}
+          TOKEN_TTL_MIN: 60
+          RUNTIME_MINUTES: ${{ inputs.runtime_minutes || '345' }}
+          START_OFFSET: ${{ inputs.offset || '-1' }}
+        run: python jadvalak_bot.py
+
+      - name: Chain the next run
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          FLAG=$(cat chain_flag.txt 2>/dev/null || echo "chain")
+          if [ "$FLAG" != "chain" ]; then
+            echo "chain flag = $FLAG — not dispatching a successor."
+            exit 0
+          fi
+          OFFSET=$(cat chain_offset.txt 2>/dev/null || echo "-1")
+          echo "dispatching successor with offset=$OFFSET"
+          curl -s -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/dispatches" \
+            -d "{\"ref\":\"main\",\"inputs\":{\"offset\":\"$OFFSET\"}}"
