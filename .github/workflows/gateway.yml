@@ -42,10 +42,12 @@ jobs:
         id: gw
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHECKER_TOKENS: ${{ secrets.BOT_TOKEN }},${{ secrets.CHECKER_TOKEN }}
+          # checker order: the channel-admin bot FIRST (the jadvalak bot
+          # itself is not a member of the channel -> 400 chat not found)
+          CHECKER_TOKENS: ${{ secrets.CHECKER_TOKEN }},${{ secrets.BOT_TOKEN }}
           GATE_CHAT_ID: ${{ secrets.GATE_CHAT_ID }}
           APP_URL: ${{ secrets.APP_URL }}
-          TOKEN_TTL_MIN: 60
+          TOKEN_TTL_MIN: 720
           RUNTIME_MINUTES: ${{ inputs.runtime_minutes || '345' }}
           START_OFFSET: ${{ inputs.offset || '-1' }}
         run: python jadvalak_bot.py
