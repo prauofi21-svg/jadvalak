@@ -1,0 +1,60 @@
+name: Daily puzzles
+
+# Generates tomorrow's 10 crosswords at 23:00 Tehran (19:30 UTC), with a
+# backup attempt at 01:00 Tehran (21:30 UTC). The day file is committed to
+# data/ and served instantly by GitHub Pages.
+
+on:
+  schedule:
+    - cron: "30 19 * * *"
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "YYYY-MM-DD Tehran date to generate (empty = tomorrow)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-puzzles
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Generate puzzles
+        env:
+          GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          DATE_ARG: ${{ inputs.date }}
+        run: |
+          if [ -n "$DATE_ARG" ]; then
+            python generate_puzzles.py --date "$DATE_ARG"
+          else
+            python generate_puzzles.py --date auto
+          fi
+
+      - name: Commit puzzle data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ || true
+          if git diff --cached --quiet; then
+            echo "data unchanged — nothing to commit"
+          else
+            git commit -m "chore: daily crossword data [skip ci]"
+            git push
+          fi
