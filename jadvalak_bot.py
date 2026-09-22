@@ -42,6 +42,7 @@ import logging
 import os
 import time
 import base64
+from urllib.parse import quote
 
 import requests
 
@@ -52,7 +53,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "60"))
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "720"))
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 CONTROL_URL = os.environ.get(
@@ -65,20 +66,26 @@ BOT_LINK = "https://t.me/jadvalak_bot"
 TG_API = "https://api.telegram.org"
 UA = {"User-Agent": "JadvalakGateway/1.0"}
 
-ABOUT_TEXT = "طراحی، ساخت و اجرا توسط @factcaster"
+SHARE_URL = (
+    "https://t.me/share/url?url=" + quote("https://t.me/jadvalak_bot", safe="")
+    + "&text=" + quote(
+        "🧩 جدولک — هر روز ۱۰ جدول کلمات متقاطع فارسی! بیا بازی کنیم 🎮",
+        safe="")
+)
+
+ABOUT_TEXT = "طراح و سازنده @factcaster"
 
 # the channel join requirement message shown to non-members
 GATE_TEXT = (
-    "برای بازی با جدول‌های کلمات متقاطع 🧩 باید اول عضو کانال "
-    "دانشنامهٔ علمی @daily_sciences بشی:\n\n"
-    "۱) روی دکمهٔ زیر بزن و عضو شو\n"
-    "۲) بعد دکمهٔ «عضو شدم» را بزن"
+    "برای بازی با جدولک 🧩 باید عضو کانال دانشنامهٔ علمی @daily_sciences باشی:\n\n"
+    "۱) روی دکمهٔ «عضویت» بزن و عضو شو\n"
+    "۲) بعد دکمهٔ «عضو شدم» را بزن تا عضویتت همین‌جا بررسی شود"
 )
 WELCOME_TEXT = (
     "به جدولک خوش اومدی 🧩\n"
-    "هر روز ۱۰ جدول کلمات متقاطع فارسی، از تم شب پرستاره تا صفحهٔ روزنامه! 🌌📰\n\n"
-    "جدول‌ها را به ترتیب حل کن و قفل جدول بعدی را باز کن. 🔓\n"
-    "موفق باشی! 🎯"
+    "هر روز ۱۰ جدول کلمات متقاطع فارسیِ تازه! ✨\n\n"
+    "جدول‌ها را به ترتیب حل کن تا قفل جدول بعدی باز شود. 🔓\n"
+    "برای دعوت دوستان، دکمهٔ «دعوت از دوستان» همین پایین هست. 📤"
 )
 
 _member_cache: dict = {}          # user_id -> (allowed, ts)
@@ -211,12 +218,18 @@ def kb_join() -> dict:
         {"text": "📢 عضویت در @daily_sciences", "url": CHANNEL_URL},
     ], [
         {"text": "✅ عضو شدم، ادامه بده", "callback_data": "joined"},
+    ], [
+        {"text": "📤 دعوت از دوستان", "url": SHARE_URL},
     ]]}
 
 
 def kb_app(user_id: int) -> dict:
     return {"inline_keyboard": [[
         {"text": "🎮 ورود به جدولک", "web_app": {"url": app_url_for(user_id)}},
+    ], [
+        {"text": "🔄 بررسی دوبارهٔ عضویت", "callback_data": "joined"},
+    ], [
+        {"text": "📤 دعوت از دوستان", "url": SHARE_URL},
     ]]}
 
 
@@ -249,13 +262,14 @@ def handle_joined(cb) -> None:
         answer_cb(cb["id"], "بررسی عضویت موفق نبود؛ چند لحظه بعد دوباره بزن.")
         return
     if member:
-        answer_cb(cb["id"], "✅ خوش اومدی!")
+        answer_cb(cb["id"], "✅ خوش اومدی! دکمهٔ «ورود به جدولک» تازه شد.")
         edit_message(chat_id, message_id, WELCOME_TEXT, kb_app(user_id))
     else:
-        answer_cb(cb["id"], "هنوز عضویتت تایید نشد! اول عضو @daily_sciences شو.",
-                  )
-        # nudge the user again with a fresh join keyboard
-        send(chat_id, "عضویت هنوز تایید نشده است. روی «عضویت» بزن و بعد دوباره «عضو شدم» را بزن 👇", kb_join())
+        answer_cb(cb["id"], "هنوز عضویتت تایید نشد! اول عضو @daily_sciences شو.")
+        # edit the same message (no spam) with a fresh nudge + join keyboard
+        edit_message(chat_id, message_id,
+                     GATE_TEXT + "\n\n⏳ هنوز عضویت دیده نشد — عضو شو و دوباره «عضو شدم» را بزن.",
+                     kb_join())
 
 
 def handle_update(upd: dict) -> None:
