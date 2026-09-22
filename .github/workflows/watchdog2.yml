@@ -1,0 +1,60 @@
+name: Gateway watchdog
+
+# Every 30 minutes: if no gateway run is in progress or queued AND the
+# control file is ON, dispatch a fresh gateway run (offset=-1 bootstrap).
+# This heals broken chains and GitHub hiccups.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Is the gateway alive?
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          ACTIVE=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/runs?per_page=20" \
+            | python3 -c "
+          import json,sys
+          runs=json.load(sys.stdin).get('workflow_runs',[])
+          active=[r for r in runs if r['status'] in ('in_progress','queued')]
+          print(len(active))
+          ")
+          echo "active gateway runs: $ACTIVE"
+          if [ "$ACTIVE" != "0" ]; then
+            echo "gateway is alive — nothing to do"
+            exit 0
+          fi
+
+          ON=$(curl -s "https://raw.githubusercontent.com/$REPO/main/control.json" \
+            | python3 -c "
+          import json,sys
+          try:
+            d=json.load(sys.stdin)
+            print('off' if str(d.get('gateway','on')).lower()=='off' else 'on')
+          except Exception:
+            print('on')
+          ")
+          echo "control state: $ON"
+          if [ "$ON" = "off" ]; then
+            echo "gateway disabled via control.json — not restarting"
+            exit 0
+          fi
+
+          echo "gateway is DOWN — restarting it"
+          curl -s -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"offset":"-1"}}'
+# registration nudge
