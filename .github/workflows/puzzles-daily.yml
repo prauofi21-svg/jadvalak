@@ -1,19 +1,28 @@
 name: Daily puzzles
 
-# Generates tomorrow's 10 crosswords at 23:00 Tehran (19:30 UTC), with a
-# backup attempt at 01:00 Tehran (21:30 UTC). The day file is committed to
-# data/ and served instantly by GitHub Pages.
+# Generates the crossword day files with GitHub-hosted runners + Groq LLM.
+#   23:00 Tehran (19:30 UTC)  — main evening run (tomorrow's file)
+#   01:00 Tehran (21:30 UTC)  — backup evening run
+#   07:00 Tehran (03:30 UTC)  — morning catch-up (heals any failed evening)
+# The generator is idempotent: an existing day file (>= 6 puzzles) is NEVER
+# overwritten, so extra runs can never change the day's puzzles mid-day.
 
 on:
   schedule:
     - cron: "30 19 * * *"
     - cron: "30 21 * * *"
+    - cron: "30 3 * * *"
   workflow_dispatch:
     inputs:
       date:
-        description: "YYYY-MM-DD Tehran date to generate (empty = tomorrow)"
+        description: "YYYY-MM-DD Tehran date to generate (empty = today+tomorrow)"
         required: false
         default: ""
+      force:
+        description: "force regeneration even if the day file exists"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -40,11 +49,12 @@ jobs:
         env:
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           DATE_ARG: ${{ inputs.date }}
+          FORCE_ARG: ${{ inputs.force && '--force' || '' }}
         run: |
           if [ -n "$DATE_ARG" ]; then
-            python generate_puzzles.py --date "$DATE_ARG"
+            python generate_puzzles.py --date "$DATE_ARG" $FORCE_ARG
           else
-            python generate_puzzles.py --date auto
+            python generate_puzzles.py --date auto $FORCE_ARG
           fi
 
       - name: Commit puzzle data
@@ -56,6 +66,6 @@ jobs:
             echo "data unchanged — nothing to commit"
           else
             git commit -m "chore: daily crossword data [skip ci]"
+            git pull --rebase --no-edit || true
             git push
           fi
-# registration nudge
