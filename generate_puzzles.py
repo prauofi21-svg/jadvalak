@@ -522,39 +522,29 @@ def top_up_reserve(date: str, use_llm: bool = True) -> list:
     return have[:RESERVE_TARGET + 5]
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description="Generate the daily crossword file")
-    ap.add_argument("--date", default="auto",
-                    help="YYYY-MM-DD (Tehran) or 'auto' = tomorrow")
-    ap.add_argument("--selftest", action="store_true",
-                    help="offline run using the builtin word bank")
-    ap.add_argument("--no-reserve", action="store_true",
-                    help="skip the reserve top-up step")
-    args = ap.parse_args()
-
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    logging.getLogger().handlers[0].setFormatter(
-        logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s", "%H:%M:%S"))
-
-    if args.date == "auto":
-        date = (datetime.now(TEHRAN_TZ) + timedelta(days=1)).strftime("%Y-%m-%d")
-    else:
-        date = args.date
-
-    use_llm = not args.selftest
-    if use_llm and not API_KEY:
-        log.error("GROK_API_KEY is not set")
-        return 2
-    if use_llm and not detect_model():
-        log.error("no LLM available")
-        return 2
+def generate_and_save(date: str, use_llm: bool, force: bool = False) -> bool:
+    """Generate + persist one day file. Idempotent: an existing, sufficiently
+    full day file is NEVER overwritten (keeps the day's puzzles stable),
+    unless force=True. Returns True on success/skip, False on failure."""
+    day_file = DATA_DIR / f"{date}.json"
+    if day_file.exists() and not force:
+        try:
+            old = json.loads(day_file.read_text(encoding="utf-8"))
+            if len(old.get("puzzles", [])) >= 6:
+                log.info("%s already generated (%d puzzles) — keeping it stable",
+                         date, len(old["puzzles"]))
+                return True
+            log.warning("%s has only %d puzzles — regenerating",
+                        date, len(old.get("puzzles", [])))
+        except (OSError, ValueError):
+            log.warning("existing %s unreadable — regenerating", day_file)
 
     log.info("generating %d puzzles for %s (llm=%s)", PUZZLES_PER_DAY, date, use_llm)
     payload, used_today = generate_day(date, use_llm)
     if not payload:
-        return 1
+        log.error("generation FAILED for %s", date)
+        return False
 
-    day_file = DATA_DIR / f"{date}.json"
     day_file.write_text(json.dumps(payload, ensure_ascii=False, indent=1),
                         encoding="utf-8")
     log.info("wrote %s (%d puzzles, %d bytes)", day_file, len(payload["puzzles"]),
@@ -568,9 +558,53 @@ def main() -> int:
         json.dumps({"words": words, "updated": date}, ensure_ascii=False, indent=0),
         encoding="utf-8")
 
-    if not args.no_reserve:
+    # final sanity: the day file must contain exactly the payload we validated
+    check = json.loads(day_file.read_text(encoding="utf-8"))
+    assert len(check["puzzles"]) == len(payload["puzzles"]) >= 6
+    log.info("DONE: %s ready with %d puzzles", date, len(check["puzzles"]))
+    return True
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Generate the daily crossword file")
+    ap.add_argument("--date", default="auto",
+                    help="YYYY-MM-DD (Tehran) or 'auto' = ensure today+tomorrow")
+    ap.add_argument("--selftest", action="store_true",
+                    help="offline run using the builtin word bank")
+    ap.add_argument("--force", action="store_true",
+                    help="regenerate even if the day file already exists")
+    ap.add_argument("--no-reserve", action="store_true",
+                    help="skip the reserve top-up step")
+    args = ap.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.getLogger().handlers[0].setFormatter(
+        logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s", "%H:%M:%S"))
+
+    use_llm = not args.selftest
+    if use_llm and not API_KEY:
+        log.error("GROK_API_KEY is not set")
+        return 2
+    if use_llm and not detect_model():
+        log.error("no LLM available")
+        return 2
+
+    if args.date == "auto":
+        today = tehran_today()
+        tomorrow = (datetime.now(TEHRAN_TZ) + timedelta(days=1)).strftime("%Y-%m-%d")
+        # morning catch-up first (today, no-op if already there), then tomorrow
+        dates = [today, tomorrow]
+    else:
+        dates = [args.date]
+
+    ok = True
+    for d in dates:
+        if not generate_and_save(d, use_llm, force=args.force):
+            ok = False
+
+    if ok and not args.no_reserve:
         try:
-            pool = top_up_reserve(date, use_llm)
+            pool = top_up_reserve(dates[-1], use_llm)
             (DATA_DIR / "reserve.json").write_text(
                 json.dumps({"puzzles": pool}, ensure_ascii=False),
                 encoding="utf-8")
@@ -578,11 +612,7 @@ def main() -> int:
         except Exception as exc:  # reserve failure must not fail the day
             log.warning("reserve top-up failed: %s", exc)
 
-    # final sanity: the day file must contain exactly the payload we validated
-    check = json.loads(day_file.read_text(encoding="utf-8"))
-    assert len(check["puzzles"]) == len(payload["puzzles"]) >= 6
-    log.info("DONE: %s ready with %d puzzles", date, len(check["puzzles"]))
-    return 0
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
