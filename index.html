@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0c1230">
+<title>جدولک 🧩</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* ================= base ================= */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:-apple-system,"Segoe UI",Tahoma,"Vazirmatn","Noto Naskh Arabic",sans-serif;
+  color:var(--ink);
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  touch-action:manipulation;
+  overscroll-behavior:none;
+  background-color:var(--bg2);
+  transition:background-color .7s ease;
+  overflow:hidden;
+}
+#bg{position:fixed;inset:0;z-index:-1;transition:opacity .45s ease}
+#bg.fade{opacity:0}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:root{
+  --csz:clamp(34px,calc((100vw - 92px)/8),47px);
+  --gap:3px;
+  --axis:17px;
+  --kh:clamp(35px,6.2vh,46px);
+  --radius:14px;
+}
+
+/* ================= theme palette (10 levels) ================= */
+/* 1 — شب پرستاره */
+.theme-1{--bg1:#0c1230;--bg2:#1c2b5a;--panel:#0e1636ee;--panel-bd:#3b4f8f66;--ink:#eef2ff;--sub:#9fb0e8;
+ --cell:#ffffffef;--cell-bd:#c7d2f2;--cell-ink:#141b38;--void:#101a3a;--kbd:#0f1a3eee;--kbd-bd:#3d52968c;--kbd-ink:#e8eeff;
+ --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#1c2b5a;--tag-ink:#ffe9a0;
+ --hl:#fde68ab8;--hl-cur:#fbbf24;--ok:#a7f3d0b8;--ok-bd:#34d399;--accent:#7aa2ff;--accent-ink:#0c1230}
+/* 2 — آسمان صبح */
+.theme-2{--bg1:#8ec9ff;--bg2:#dff1ff;--panel:#ffffffd9;--panel-bd:#7fb6e8;--ink:#17395c;--sub:#4a6d92;
+ --cell:#ffffff;--cell-bd:#9cc4e8;--cell-ink:#17395c;--void:#6ea8d8;--kbd:#ffffffe6;--kbd-bd:#8fc0ea;--kbd-ink:#17395c;
+ --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#1e7ce0;--tag-ink:#ffffff;
+ --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#1e7ce0;--accent-ink:#fff}
+/* 3 — روزنامه */
+.theme-3{--bg1:#efe9dc;--bg2:#e4dcc9;--panel:#faf6ec;--panel-bd:#1a1a1a;--ink:#1a1a1a;--sub:#5a5a5a;
+ --cell:#fdfbf5;--cell-bd:#1a1a1a;--cell-ink:#111;--void:#242424;--kbd:#f7f2e4;--kbd-bd:#1a1a1a;--kbd-ink:#1a1a1a;
+ --banner:#ffffff;--banner-bd:#1a1a1a;--banner-ink:#111;--tag:#1a1a1a;--tag-ink:#f5f0e2;
+ --hl:#f3e3a0cc;--hl-cur:#b8960f;--ok:#cfe6c9;--ok-bd:#4e7a43;--accent:#8b1a1a;--accent-ink:#fff}
+/* 4 — باغ سبز */
+.theme-4{--bg1:#e8f5e0;--bg2:#cdebc4;--panel:#ffffffd6;--panel-bd:#9cc79a;--ink:#1d3d1f;--sub:#4a6d4c;
+ --cell:#ffffff;--cell-bd:#a5cfa0;--cell-ink:#1d3d1f;--void:#6d9a63;--kbd:#ffffffe6;--kbd-bd:#a5cfa0;--kbd-ink:#1d3d1f;
+ --banner:#fff7d6;--banner-bd:#d9c768;--banner-ink:#33290a;--tag:#2f7a2a;--tag-ink:#fff;
+ --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#2f7a2a;--accent-ink:#fff}
+/* 5 — چوب گرم */
+.theme-5{--bg1:#a9764f;--bg2:#7d5230;--panel:#f5e9d2e0;--panel-bd:#5c3d22;--ink:#3a2413;--sub:#6b4a2b;
+ --cell:#f5e9d2;--cell-bd:#8a5a2b;--cell-ink:#3a2413;--void:#5c3d22;--kbd:#efe2c6e6;--kbd-bd:#8a5a2b;--kbd-ink:#3a2413;
+ --banner:#fff3d0;--banner-bd:#8a5a2b;--banner-ink:#4a3407;--tag:#8a5a2b;--tag-ink:#ffefd0;
+ --hl:#fde68ab8;--hl-cur:#d97706;--ok:#c8e6c9b8;--ok-bd:#5e8c3e;--accent:#8a5a2b;--accent-ink:#ffefd0}
+/* 6 — اقیانوس */
+.theme-6{--bg1:#0e5f6e;--bg2:#17a2b8;--panel:#eafcffdd;--panel-bd:#25d3f066;--ink:#06333c;--sub:#0d5560;
+ --cell:#ffffff;--cell-bd:#7fc9d6;--cell-ink:#06333c;--void:#0a3f4a;--kbd:#d9f6fae6;--kbd-bd:#7fc9d6;--kbd-ink:#06333c;
+ --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#0e5f6e;--tag-ink:#d5f7fb;
+ --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#0e7a8c;--accent-ink:#fff}
+/* 7 — کویر */
+.theme-7{--bg1:#f2dcae;--bg2:#e0b980;--panel:#fff8e8d9;--panel-bd:#c05621;--ink:#5c3d1e;--sub:#8a6a3f;
+ --cell:#fffdf2;--cell-bd:#d9a05f;--cell-ink:#5c3d1e;--void:#b9884d;--kbd:#faf0d8e6;--kbd-bd:#d9a05f;--kbd-ink:#5c3d1e;
+ --banner:#fff7d6;--banner-bd:#c05621;--banner-ink:#4a2a08;--tag:#c05621;--tag-ink:#fff;
+ --hl:#fde68ab8;--hl-cur:#d97706;--ok:#c8e6c9b8;--ok-bd:#5e8c3e;--accent:#c05621;--accent-ink:#fff}
+/* 8 — نئون شب */
+.theme-8{--bg1:#0a0a12;--bg2:#131327;--panel:#16162aee;--panel-bd:#00e5ff44;--ink:#e8f6ff;--sub:#8ba7c7;
+ --cell:#14141f;--cell-bd:#00e5ff59;--cell-ink:#e8f6ff;--void:#05050c;--kbd:#181828ee;--kbd-bd:#00e5ff3d;--kbd-ink:#c9f6ff;
+ --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#00e5ff;--tag-ink:#04202a;
+ --hl:#fde68a4d;--hl-cur:#00e5ff;--ok:#00ffc84d;--ok-bd:#00ffc8;--accent:#00e5ff;--accent-ink:#04202a}
+/* 9 — کهکشان */
+.theme-9{--bg1:#2a1b4d;--bg2:#4a2d7a;--panel:#f0e9ffdd;--panel-bd:#b48cff66;--ink:#2a1b4d;--sub:#5c4a8a;
+ --cell:#ffffff;--cell-bd:#c4a8f0;--cell-ink:#2a1b4d;--void:#1c1035;--kbd:#e6dcffe6;--kbd-bd:#c4a8f0;--kbd-ink:#2a1b4d;
+ --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#6b3fd4;--tag-ink:#fff;
+ --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#6b3fd4;--accent-ink:#fff}
+/* 10 — جشن طلایی */
+.theme-10{--bg1:#f7d774;--bg2:#edbd45;--panel:#fffdf0d9;--panel-bd:#b8860b;--ink:#4a3407;--sub:#7a5c1a;
+ --cell:#fffdf0;--cell-bd:#d9b64a;--cell-ink:#4a3407;--void:#c99a2e;--kbd:#fdf5d8e6;--kbd-bd:#d9b64a;--kbd-ink:#4a3407;
+ --banner:#ffffff;--banner-bd:#b8860b;--banner-ink:#4a3407;--tag:#b8860b;--tag-ink:#fff;
+ --hl:#fde68ab8;--hl-cur:#d97706;--ok:#c8e6c9b8;--ok-bd:#5e8c3e;--accent:#b8860b;--accent-ink:#fff}
+
+/* decorative backgrounds (pure CSS, zero images) */
+.theme-1 #bg,.theme-6 #bg,.theme-8 #bg,.theme-9 #bg{background:radial-gradient(120% 90% at 50% 0%,var(--bg2) 0%,var(--bg1) 70%)}
+.theme-2 #bg{background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 62%,#f4faff 100%)}
+.theme-3 #bg{background:
+  repeating-linear-gradient(0deg,#00000006 0 2px,transparent 2px 4px),
+  repeating-linear-gradient(90deg,#00000005 0 2px,transparent 2px 4px),
+  linear-gradient(160deg,var(--bg1),var(--bg2))}
+.theme-4 #bg{background:radial-gradient(140% 90% at 80% 0%,var(--bg2) 0%,var(--bg1) 75%)}
+.theme-5 #bg{background:
+  repeating-linear-gradient(93deg,#00000012 0 3px,transparent 3px 14px),
+  linear-gradient(170deg,var(--bg1),var(--bg2))}
+.theme-7 #bg{background:
+  radial-gradient(90% 44% at 50% 100%,#c99a2e33 0%,transparent 70%),
+  radial-gradient(120% 70% at 50% 0%,var(--bg2) 0%,var(--bg1) 80%)}
+.theme-10 #bg{background:
+  radial-gradient(60% 40% at 20% 10%,#fff8d699 0%,transparent 60%),
+  radial-gradient(80% 50% at 90% 90%,#c99a2e55 0%,transparent 60%),
+  linear-gradient(160deg,var(--bg1),var(--bg2))}
+/* tiny stars for the night / galaxy themes */
+.theme-1 #bg::after,.theme-9 #bg::after{content:"";position:absolute;inset:0;background-image:
+  radial-gradient(1.5px 1.5px at 12% 18%,#fff9 50%,transparent 51%),
+  radial-gradient(1px 1px at 30% 8%,#fff8 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 55% 24%,#fff7 50%,transparent 51%),
+  radial-gradient(1px 1px at 72% 12%,#fff8 50%,transparent 51%),
+  radial-gradient(2px 2px at 88% 30%,#fff6 50%,transparent 51%),
+  radial-gradient(1px 1px at 8% 55%,#fff5 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 40% 60%,#fff4 50%,transparent 51%),
+  radial-gradient(1px 1px at 65% 70%,#fff5 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 90% 82%,#fff4 50%,transparent 51%),
+  radial-gradient(1px 1px at 18% 88%,#fff5 50%,transparent 51%);animation:twinkle 5s ease-in-out infinite alternate}
+.theme-8 #bg::after{content:"";position:absolute;inset:0;background-image:
+  radial-gradient(90% 40% at 50% 108%,#00e5ff1a 0%,transparent 60%),
+  radial-gradient(70% 34% at 18% -8%,#ff2fd01f 0%,transparent 60%)}
+@keyframes twinkle{from{opacity:.55}to{opacity:1}}
+
+/* ================= app shell ================= */
+#app{height:100dvh;display:flex;flex-direction:column;padding:8px 8px calc(6px + env(safe-area-inset-bottom));gap:7px;opacity:0;animation:appIn .5s ease .05s forwards}
+@keyframes appIn{to{opacity:1}}
+
+.hdr{display:flex;align-items:center;gap:8px;padding:2px 4px;flex:0 0 auto}
+.brand{flex:1;min-width:0}
+.brand h1{font-size:1.15rem;font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand small{display:block;font-size:.72rem;color:var(--sub);font-weight:600;margin-top:1px}
+.menu-btn{width:38px;height:38px;border-radius:12px;background:var(--panel);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1.05rem;font-weight:800;transition:transform .15s,background-color .5s}
+.menu-btn:active{transform:scale(.9)}
+
+.dots{display:flex;gap:5px;justify-content:center;flex:0 0 auto;padding:1px 0 0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--panel);border:1px solid var(--panel-bd);transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer}
+.dot.cur{transform:scale(1.5);border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}
+.dot.done{background:var(--accent);border-color:var(--accent)}
+.dot.lock{opacity:.38;cursor:default}
+
+/* ================= clue banner ================= */
+.clue-banner{flex:0 0 auto;min-height:56px;display:flex;align-items:center;gap:10px;background:var(--banner);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:9px 13px;box-shadow:0 6px 18px -8px #0005;transition:background-color .5s,border-color .5s}
+.clue-tag{flex:0 0 auto;background:var(--tag);color:var(--tag-ink);font-weight:800;font-size:.92rem;padding:5px 12px;border-radius:999px;white-space:nowrap;box-shadow:inset 0 -2px 0 #0002}
+.clue-text{flex:1;min-width:0;font-size:18px;font-weight:800;line-height:1.6;color:var(--banner-ink);word-break:break-word}
+.clue-banner.pop .clue-text,.clue-banner.pop .clue-tag{animation:clueIn .32s cubic-bezier(.2,.8,.3,1)}
+@keyframes clueIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.clue-banner.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translateX(6px)}40%{transform:translateX(-6px)}60%{transform:translateX(4px)}80%{transform:translateX(-4px)}}
+
+/* ================= grid ================= */
+.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0}
+.grid-wrap{display:grid;grid-template-columns:var(--axis) repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);padding:2px}
+.axn{display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--sub);opacity:.95}
+.cell{width:var(--csz);height:var(--csz);background:var(--cell);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
+.cell.void{background:var(--void);border-color:transparent;cursor:default}
+.cell.hl{background:var(--hl)}
+.cell.cur{border-color:var(--hl-cur);box-shadow:0 0 0 2px var(--hl-cur) inset;background:var(--hl)}
+.cell.locked{background:var(--ok);border-color:var(--ok-bd);color:var(--cell-ink)}
+.cell span{pointer-events:none;animation:letterIn .16s cubic-bezier(.2,.8,.3,1.4)}
+@keyframes letterIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+.cell.pop{animation:cellPop .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes cellPop{50%{transform:scale(1.13)}}
+.grid-wrap.entrance .cell{animation:cellIn .4s both cubic-bezier(.2,.8,.3,1)}
+@keyframes cellIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.word-sweep{position:relative;overflow:hidden}
+.word-sweep::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 20%,#ffffffb8 50%,transparent 80%);animation:sweep .55s ease}
+@keyframes sweep{from{transform:translateX(120%)}to{transform:translateX(-120%)}}
+
+/* ================= word progress ================= */
+.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:var(--sub)}
+.wbar{flex:1;height:6px;border-radius:99px;background:var(--panel);border:1px solid var(--panel-bd);overflow:hidden}
+.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--hl-cur));transition:width .5s cubic-bezier(.2,.8,.3,1)}
+
+/* ================= keyboard ================= */
+.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:4px 2px 0}
+.krow{display:flex;gap:6px;justify-content:center}
+.key{width:clamp(34px,calc((100vw - 76px)/8),46px);height:var(--kh);background:var(--kbd);border:1px solid var(--kbd-bd);border-radius:11px;font-size:1.06rem;font-weight:700;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:0 2px 0 #00000022,inset 0 1px 0 #ffffff30;transition:transform .09s,filter .09s,background-color .5s;cursor:pointer}
+.key:active,.key.pressed{transform:scale(.86) translateY(2px);filter:brightness(1.18);box-shadow:0 0 0 #00000022}
+.key.bk{flex:1;max-width:calc(clamp(34px,calc((100vw - 76px)/8),46px)*3);font-size:.92rem;gap:7px;display:flex;align-items:center;justify-content:center}
+.key.bk svg{width:20px;height:20px;fill:currentColor}
+
+/* ================= full screens (gate / loading / error) ================= */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:26px;text-align:center;z-index:50}
+.screen[hidden]{display:none}
+.logo{font-size:3.4rem;animation:logoFloat 3s ease-in-out infinite}
+@keyframes logoFloat{50%{transform:translateY(-9px) rotate(-4deg)}}
+.screen h2{font-size:1.5rem;font-weight:800}
+.screen p{font-size:.95rem;line-height:1.9;color:var(--sub);font-weight:600;max-width:330px}
+.btn{background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 6px 16px -6px #0006;transition:transform .15s,filter .15s;min-width:230px}
+.btn:active{transform:scale(.95)}
+.btn.ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:none}
+.spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--panel-bd);border-top-color:var(--accent);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pulse-tip{animation:pulseTip 2s ease-in-out infinite}
+@keyframes pulseTip{50%{opacity:.55}}
+
+/* ================= bottom sheet (⋮ menu / about / help) ================= */
+#sheet{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
+#sheet[hidden]{display:none}
+#sheet .scrim{position:absolute;inset:0;background:#00000073;backdrop-filter:none;animation:fadeIn .25s}
+@keyframes fadeIn{from{opacity:0}}
+#sheet .card{position:relative;width:min(430px,100%);background:var(--panel);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
+@keyframes sheetUp{from{transform:translateY(60%);opacity:.4}}
+#sheet .grab{width:44px;height:5px;border-radius:9px;background:var(--panel-bd);margin:0 auto 12px}
+#sheet h3{font-size:1.05rem;font-weight:800;margin-bottom:10px}
+#sheet .row{display:flex;align-items:center;gap:12px;width:100%;text-align:right;padding:13px 12px;border-radius:14px;font-weight:700;font-size:.98rem;transition:background-color .15s}
+#sheet .row:active{background:#ffffff1a}
+#sheet .row .ic{font-size:1.25rem;width:26px;text-align:center}
+#sheet .divider{height:1px;background:var(--panel-bd);margin:7px 0}
+#sheet .about-text{font-size:1.02rem;font-weight:800;line-height:2;padding:8px 4px 2px}
+#sheet .about-text a{color:var(--accent);text-decoration:none}
+#sheet .ver{font-size:.75rem;color:var(--sub);margin-top:10px;text-align:center}
+#sheet .help-body{font-size:.92rem;line-height:2.1;font-weight:600;color:var(--ink);padding:4px 2px}
+
+/* ================= win overlay + confetti ================= */
+#win{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#000000a6}
+#win[hidden]{display:none}
+#win .card{width:min(360px,88vw);background:var(--panel);border:1.5px solid var(--panel-bd);border-radius:24px;padding:30px 24px;text-align:center;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
+@keyframes winIn{from{transform:scale(.55);opacity:0}}
+#win .big{font-size:3.2rem;animation:logoFloat 2.6s ease-in-out infinite}
+#win h2{font-size:1.45rem;font-weight:900;margin:6px 0 4px}
+#win p{font-size:.9rem;color:var(--sub);font-weight:600;line-height:1.9}
+#win .btn{margin-top:14px;min-width:200px}
+.confetti{position:fixed;top:-4vh;width:10px;height:14px;z-index:91;pointer-events:none;animation:confFall var(--dur,2.4s) cubic-bezier(.3,.5,.6,1) var(--delay,0s) forwards;opacity:0}
+.confetti i{display:block;width:100%;height:100%;background:var(--c,#fbbf24);border-radius:2px;transform:rotate(var(--r,0deg));animation:confSpin var(--dur,2.4s) linear infinite}
+@keyframes confFall{3%{opacity:1}to{transform:translateY(112vh);opacity:0}}
+@keyframes confSpin{to{transform:rotate(calc(var(--r,0deg) + 540deg))}}
+
+/* ================= toast ================= */
+#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:var(--panel);border:1.5px solid var(--ok-bd);color:var(--ink);font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 10px 26px -8px #000a;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+#toast.show{opacity:1;transform:translateX(50%) translateY(4px)}
+
+/* tiny screens: shrink banner font a bit */
+@media (max-height:640px){
+  .clue-text{font-size:16px}
+  :root{--kh:clamp(32px,5.6vh,42px);--csz:clamp(31px,calc((100vw - 88px)/8),42px)}
+}
+/* very long clue: keep grid visible, banner scrolls after 3 lines */
+.clue-text{max-height:5.1em;overflow:auto}
+
+
+</style>
+</head>
+<body class="theme-1">
+<div id="bg"></div>
+<!-- ============ gate screen (join the channel first) ============ -->
+<div id="gate" class="screen" hidden>
+  <div class="logo">🧩</div>
+  <h2>جدولک</h2>
+  <p id="gate-msg">برای بازی با جدول‌های روزانه، اول عضو کانال
+  <b>دانشنامهٔ علمی</b> شو؛ بعد از تایید عضویت، بازی برایت باز می‌شود.</p>
+  <button class="btn" id="btn-join">📢 عضویت در @daily_sciences</button>
+  <button class="btn ghost" id="btn-verify">✅ عضو شدم، ورود به بازی</button>
+  <p class="pulse-tip" style="font-size:.78rem">اگر عضویت را لغو کرده باشی، برای بازگشت دوباره عضو شو.</p>
+</div>
+
+<!-- ============ not inside telegram ============ -->
+<div id="no-tg" class="screen" hidden>
+  <div class="logo">🧩</div>
+  <h2>جدولک داخل تلگرام باز می‌شود</h2>
+  <p>این بازی یک مینی‌اپ تلگرامی است. از داخل ربات <b>@jadvalak_bot</b> اجرایش کن.</p>
+  <button class="btn" id="btn-open-bot">🤖 باز کردن ربات جدولک</button>
+</div>
+
+<!-- ============ loading / error ============ -->
+<div id="loading" class="screen" hidden>
+  <div class="spin"></div>
+  <p>در حال آماده‌سازی جدول‌های امروز…</p>
+</div>
+<div id="loaderr" class="screen" hidden>
+  <div class="logo">📡</div>
+  <h2>جدول‌های امروز هنوز آماده نشده‌اند</h2>
+  <p>کمی بعد دوباره تلاش می‌کنیم. اگر مشکل اتصال داری، اینترنت یا پروکسی‌ات را بررسی کن.</p>
+  <button class="btn" id="btn-retry">🔄 تلاش مجدد</button>
+</div>
+
+<!-- ============ main app ============ -->
+<div id="app" hidden>
+  <header class="hdr">
+    <button class="menu-btn" id="btn-menu" aria-label="منو">⋮</button>
+    <div class="brand">
+      <h1>🧩 جدولک</h1>
+      <small id="lvl-label">جدول ۱ از ۱۰</small>
+    </div>
+    <div style="width:38px"></div>
+  </header>
+  <div class="dots" id="dots"></div>
+  <div class="clue-banner" id="banner">
+    <span class="clue-tag" id="clue-tag">افقی ۱</span>
+    <span class="clue-text" id="clue-text">…</span>
+  </div>
+  <div class="grid-zone"><div class="grid-wrap" id="grid-wrap">
+    <div class="axn"></div><!-- corner -->
+  </div></div>
+  <div class="wprog">
+    <span id="wcount">۰ از ۰ واژه</span>
+    <div class="wbar"><i id="wbar-i"></i></div>
+  </div>
+  <div class="kbd" id="kbd"></div>
+</div>
+
+<!-- ============ bottom sheet (menu / about / help) ============ -->
+<div id="sheet" hidden>
+  <div class="scrim" id="sheet-scrim"></div>
+  <div class="card">
+    <div class="grab"></div>
+    <div id="sheet-menu">
+      <h3>منوی جدولک</h3>
+      <button class="row" id="m-about"><span class="ic">ℹ️</span> درباره جدولک</button>
+      <button class="row" id="m-help"><span class="ic">📖</span> راهنمای بازی</button>
+      <div class="divider"></div>
+      <button class="row" id="m-reset"><span class="ic">🔄</span> شروع مجدد همین جدول</button>
+      <button class="row" id="m-wipe"><span class="ic">🧹</span> پاک‌کردن همهٔ پیشرفت امروز</button>
+    </div>
+    <div id="sheet-about" hidden>
+      <h3>درباره جدولک</h3>
+      <p class="about-text">طراحی، ساخت و اجرا توسط <a id="factcaster-link" href="#">@factcaster</a></p>
+      <p style="font-size:.85rem;color:var(--sub);line-height:2;font-weight:600">
+        جدول‌های تازه هر روز با هوش مصنوعی ساخته و با دقت الگوریتمی بررسی می‌شوند.</p>
+      <div class="divider"></div>
+      <button class="row" id="about-back"><span class="ic">↩️</span> بازگشت</button>
+    </div>
+    <div id="sheet-help" hidden>
+      <h3>راهنمای بازی</h3>
+      <div class="help-body">
+        • با لمس هر خانه، واژهٔ <b>افقی</b> آن انتخاب می‌شود؛ با لمس دوبارهٔ همان خانه، جهت به <b>عمودی</b> تغییر می‌کند.<br>
+        • با کیبورد داخل بازی، حرف‌ها را تایپ کن؛ بعد از هر حرف به خانهٔ بعد می‌روی.<br>
+        • کلید «پاک‌کردن» حرف را حذف می‌کند و به خانهٔ قبلی برمی‌گردد.<br>
+        • هر واژهٔ کامل‌شده قفل می‌شود و سبز رنگ می‌شود.<br>
+        • جدول بعدی فقط بعد از حل جدول فعلی باز می‌شود.<br>
+        • تم صفحه در هر جدول عوض می‌شود؛ جدول سوم در صفحهٔ روزنامه است! 📰
+      </div>
+      <div class="divider"></div>
+      <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
+    </div>
+    <div class="ver">جدولک نسخه ۱٫۰</div>
+  </div>
+</div>
+
+<!-- ============ win overlay ============ -->
+<div id="win" hidden>
+  <div class="card">
+    <div class="big" id="win-emoji">🎉</div>
+    <h2 id="win-title">آفرین!</h2>
+    <p id="win-sub">جدول را کامل حل کردی.</p>
+    <button class="btn" id="btn-next">جدول بعدی</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ================= Telegram ================= */
+const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+const CHANNEL = "https://t.me/daily_sciences";
+const BOT_LINK = "https://t.me/jadvalak_bot";
+const ABOUT_LINK = "https://t.me/factcaster";
+
+function tgReady(){
+  try{ TG && TG.ready(); }catch(e){}
+  try{ TG && TG.expand(); }catch(e){}
+  try{ TG && TG.setVerticalSwipesEnabled && TG.setVerticalSwipesEnabled(false); }catch(e){}
+  try{ TG && TG.disableVerticalSwipes && TG.disableVerticalSwipes(); }catch(e){}
+}
+function haptic(kind, style){
+  try{
+    if(kind==="impact") TG.HapticFeedback.impactOccurred(style||"light");
+    else TG.HapticFeedback.notificationOccurred(style||"success");
+  }catch(e){}
+}
+function tgOpen(url){ try{ TG && TG.openTelegramLink ? TG.openTelegramLink(url) : (location.href=url); }catch(e){ location.href=url; } }
+
+/* ================= helpers ================= */
+const $ = id => document.getElementById(id);
+const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+const fa = n => String(n).replace(/\d/g, d => FA_DIGITS[+d]);
+const KEY = { // the 32-letter Persian keyboard (4 rows of 8)
+  rows: [
+    ["ض","ص","ث","ق","ف","غ","ع","ه"],
+    ["خ","ح","ج","چ","ش","س","ی","ب"],
+    ["ظ","ط","ز","ر","ذ","د","ژ","پ"],
+    ["ل","ا","ت","ن","م","ک","گ","و"],
+  ]
+};
+const SIZE = 8;
+
+function tehranDate(){
+  try{
+    return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Tehran",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  }catch(e){
+    const d = new Date(Date.now() + 3.5*3600*1000);
+    return d.toISOString().slice(0,10);
+  }
+}
+
+/* XOR+base64 answer decoder (light obfuscation of the day file) */
+function decodeWord(b64, key){
+  try{
+    let s = b64.replace(/-/g,"+").replace(/_/g,"/");
+    while(s.length % 4) s += "=";
+    const bin = atob(s);
+    const kb = new Uint8Array([...key].map(c=>c.charCodeAt(0)));
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i) ^ kb[i % kb.length];
+    return new TextDecoder("utf-8").decode(bytes);
+  }catch(e){ return ""; }
+}
+
+/* ================= gate (channel membership) ================= */
+function gateState(){
+  const user = TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
+  if(!user || !user.id) return "no-tg";
+  const qs = new URLSearchParams(location.search);
+  const st = qs.get("st");
+  if(st){
+    const parts = st.split(".");
+    if(parts.length === 3){
+      const uid = +parts[0], exp = +parts[1];
+      if(uid === user.id && exp > Date.now()/1000 && parts[2].length > 20)
+        return "app";
+    }
+  }
+  return "gate";
+}
+function userId(){ const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user; return u && u.id ? u.id : 0; }
+
+/* ================= progress persistence ================= */
+function progressKey(){ return "jk:" + userId() + ":" + tehranDate(); }
+function loadProgress(){
+  try{ return JSON.parse(localStorage.getItem(progressKey())) || {}; }catch(e){ return {}; }
+}
+function saveProgress(p){
+  try{ localStorage.setItem(progressKey(), JSON.stringify(p)); }catch(e){}
+}
+
+/* ================= day data ================= */
+async function fetchDay(date){
+  const cacheKey = "jk:data:" + date;
+  for(let attempt=0; attempt<3; attempt++){
+    try{
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), 15000);
+      const res = await fetch("data/" + date + ".json", {cache:"no-store", signal:ctrl.signal});
+      clearTimeout(t);
+      if(res.ok){
+        const data = await res.json();
+        try{ localStorage.setItem(cacheKey, JSON.stringify(data)); }catch(e){}
+        return data;
+      }
+      if(res.status === 404) break;
+    }catch(e){}
+    await new Promise(r=>setTimeout(r, 1500));
+  }
+  try{ const cached = localStorage.getItem(cacheKey); if(cached) return JSON.parse(cached); }catch(e){}
+  return null;
+}
+
+/* ================= puzzle model ================= */
+/* words: [{w,r,c,d,clue}] -> cells map + word objects */
+function buildModel(puzzle, date){
+  const cells = {};   // "r,c" -> {r,c,sol,h,v,locked,el}
+  const words = puzzle.words.map(raw => {
+    const w = { w: decodeWord(raw.e, date), r: raw.r, c: raw.c, d: raw.d, clue: raw.clue, cells: [], solved: false };
+    for(let i=0;i<w.w.length;i++){
+      const r = w.d==="h" ? w.r : w.r+i;
+      const c = w.d==="h" ? w.c+i : w.c;
+      const k = r+","+c;
+      if(!cells[k]) cells[k] = {r, c, sol: w.w[i], h:null, v:null, locked:false, el:null};
+      cells[k][w.d==="h"?"h":"v"] = w;
+      w.cells.push(cells[k]);
+    }
+    return w;
+  });
+  return { n: puzzle.n, words, cells };
+}
+
+/* ================= global state ================= */
+let day = null, models = [], pIdx = 0, P = null, cur = null;
+let typedCells = {};          // "r,c" -> letter  (current puzzle)
+let progress = {cur:0, typed:{}};
+const THEME_HEAD = {1:"#0c1230",2:"#8ec9ff",3:"#efe9dc",4:"#e8f5e0",5:"#a9764f",
+                    6:"#0e5f6e",7:"#f2dcae",8:"#0a0a12",9:"#2a1b4d",10:"#f7d774"};
+
+/* ================= rendering ================= */
+function renderGrid(){
+  const wrap = $("grid-wrap");
+  wrap.innerHTML = "";
+  // top axis: corner + column numbers ۱..۸ (۱ = rightmost)
+  wrap.appendChild(Object.assign(document.createElement("div"),{className:"axn"}));
+  for(let c=0;c<SIZE;c++){
+    const d = document.createElement("div"); d.className="axn"; d.textContent = fa(c+1);
+    wrap.appendChild(d);
+  }
+  for(let r=0;r<SIZE;r++){
+    const rn = document.createElement("div"); rn.className="axn"; rn.textContent = fa(r+1);
+    wrap.appendChild(rn);
+    for(let c=0;c<SIZE;c++){
+      const cell = P.cells[r+","+c];
+      const d = document.createElement("div");
+      d.className = cell ? "cell" : "cell void";
+      d.style.animationDelay = ((r+c)*16)+"ms";
+      if(cell){
+        cell.el = d;
+        d.addEventListener("pointerdown", ()=>tapCell(cell));
+        if(cell.locked) d.classList.add("locked");
+        const ch = typedCells[r+","+c] || (cell.locked ? cell.sol : "");
+        if(ch) d.textContent = ch;
+      }
+      wrap.appendChild(d);
+    }
+  }
+  wrap.classList.remove("entrance");
+  void wrap.offsetWidth;
+  wrap.classList.add("entrance");
+}
+
+function renderKeyboard(){
+  const kbd = $("kbd");
+  kbd.innerHTML = "";
+  KEY.rows.forEach(row=>{
+    const rEl = document.createElement("div"); rEl.className="krow";
+    row.forEach(ch=>{
+      const k = document.createElement("button"); k.className="key"; k.textContent = ch;
+      k.addEventListener("pointerdown", e=>{ e.preventDefault(); pressFx(k); typeLetter(ch); });
+      rEl.appendChild(k);
+    });
+    kbd.appendChild(rEl);
+  });
+  const rEl = document.createElement("div"); rEl.className="krow";
+  const bk = document.createElement("button"); bk.className="key bk";
+  bk.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 5H9a2 2 0 0 0-1.6.8L1.4 12l6 6.2A2 2 0 0 0 9 19h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-4 10.6-1.4 1.4L13.5 14l-3.1 3-1.4-1.4 3.1-3.1-3.1-3.1 1.4-1.4 3.1 3.1 3.1-3.1 1.4 1.4-3.1 3.1z"/></svg><span>پاک‌کردن</span>';
+  bk.addEventListener("pointerdown", e=>{ e.preventDefault(); pressFx(bk); backspace(); });
+  rEl.appendChild(bk);
+  kbd.appendChild(rEl);
+}
+function pressFx(el){
+  el.classList.add("pressed");
+  setTimeout(()=>el.classList.remove("pressed"), 110);
+  haptic("impact","light");
+}
+
+function renderCellLetter(cell, ch){
+  if(!cell.el) return;
+  cell.el.textContent = ch || "";
+  if(ch){ cell.el.classList.remove("pop"); void cell.el.offsetWidth; cell.el.classList.add("pop"); }
+}
+
+function renderDots(){
+  const box = $("dots"); box.innerHTML = "";
+  day.puzzles.forEach((p,i)=>{
+    const d = document.createElement("div");
+    const done = isPuzzleComplete(p.n);
+    const unlocked = isUnlocked(p.n);
+    d.className = "dot" + (done ? " done" : "") + (unlocked ? "" : " lock") + (i===pIdx ? " cur" : "");
+    d.title = "جدول " + fa(p.n);
+    d.addEventListener("pointerdown", ()=>{
+      if(!isUnlocked(p.n)){ toast("🔒 اول جدول قبلی را حل کن!"); return; }
+      if(i!==pIdx) openPuzzle(i);
+    });
+    box.appendChild(d);
+  });
+}
+
+function updateBanner(){
+  if(!cur) return;
+  const w = cur.word;
+  const num = w.d==="h" ? w.r+1 : w.c+1;
+  $("clue-tag").textContent = (w.d==="h" ? "افقی " : "عمودی ") + fa(num);
+  $("clue-text").textContent = w.clue || "…";
+  const b = $("banner");
+  b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
+}
+
+function updateHighlights(){
+  document.querySelectorAll(".cell.hl").forEach(el=>el.classList.remove("hl","cur"));
+  if(!cur) return;
+  cur.word.cells.forEach(c=>{ if(c.el) c.el.classList.add("hl"); });
+  if(cur.cell.el) cur.cell.el.classList.add("cur");
+}
+
+function updateWordProgress(){
+  const total = P.words.length, done = P.words.filter(w=>w.solved).length;
+  $("wcount").textContent = fa(done) + " از " + fa(total) + " واژه";
+  $("wbar-i").style.width = (total ? (done/total*100) : 0) + "%";
+  $("lvl-label").textContent = "جدول " + fa(P.n) + " از " + fa(day.puzzles.length);
+}
+
+function applyTheme(n){
+  const idx = ((n-1)%10)+1;
+  const cls = "theme-"+idx;
+  const head = THEME_HEAD[idx];
+  const bg = $("bg");
+  bg.classList.add("fade");
+  setTimeout(()=>{
+    document.body.className = cls;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute("content", head);
+    try{ TG && TG.setHeaderColor && TG.setHeaderColor(head); }catch(e){}
+    try{ TG && TG.setBackgroundColor && TG.setBackgroundColor(head); }catch(e){}
+    bg.classList.remove("fade");
+  }, 220);
+}
+
+/* ================= selection & input ================= */
+function selectWord(word, cell){
+  cur = {word, cell, dir: word.d};
+  updateBanner(); updateHighlights();
+}
+
+function tapCell(cell){
+  if(!cell || cell.locked && !cell.h && !cell.v) return;
+  if(cur && cur.cell === cell){
+    // second tap on the same cell -> switch direction
+    const other = cur.dir === "h" ? cell.v : cell.h;
+    if(other && other !== cur.word){ haptic("impact","medium"); selectWord(other, cell); return; }
+  }
+  const w = (cur && cur.cell === cell) ? cur.word : (cell.h || cell.v);
+  if(w){ haptic("impact","light"); selectWord(w, cell); }
+}
+
+function firstEditable(word){
+  for(const c of word.cells) if(!c.locked) return c;
+  return null;
+}
+
+function advance(){
+  if(!cur) return;
+  const idx = cur.word.cells.indexOf(cur.cell);
+  for(let i=idx+1;i<cur.word.cells.length;i++){
+    if(!cur.word.cells[i].locked){ cur.cell = cur.word.cells[i]; updateHighlights(); return; }
+  }
+  // stay on the last cell
+}
+
+function typeLetter(ch){
+  if(!cur || !cur.cell) return;
+  if(cur.cell.locked || cur.word.solved){ advance(); return; }
+  typedCells[cur.cell.r+","+cur.cell.c] = ch;
+  renderCellLetter(cur.cell, ch);
+  haptic("impact","light");
+  persist();
+  if(wordSolved(cur.word)){ lockWord(cur.word, true); return; }
+  if(wordFilled(cur.word)) shakeBanner();
+  advance();
+}
+
+function backspace(){
+  if(!cur || !cur.cell) return;
+  const k = cur.cell.r+","+cur.cell.c;
+  if(!cur.cell.locked && typedCells[k]){
+    delete typedCells[k];
+    renderCellLetter(cur.cell, "");
+    haptic("impact","light");
+    persist();
+    return;
+  }
+  // auto-return to the previous cell of the word
+  const idx = cur.word.cells.indexOf(cur.cell);
+  for(let i=idx-1;i>=0;i--){
+    const prev = cur.word.cells[i];
+    if(prev.locked) continue;
+    cur.cell = prev;
+    const pk = prev.r+","+prev.c;
+    if(typedCells[pk]){ delete typedCells[pk]; renderCellLetter(prev, ""); }
+    updateHighlights(); haptic("impact","light"); persist();
+    return;
+  }
+}
+
+function wordFilled(word){
+  return word.cells.every(c => c.locked || typedCells[c.r+","+c.c]);
+}
+function wordSolved(word){
+  return word.cells.every(c => c.locked || typedCells[c.r+","+c.c] === c.sol);
+}
+function shakeBanner(){
+  const b = $("banner");
+  b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake");
+}
+
+function lockWord(word, celebrate){
+  word.solved = true;
+  word.cells.forEach((c,i)=>{
+    c.locked = true;
+    typedCells[c.r+","+c.c] = c.sol;
+    if(c.el){
+      c.el.classList.add("locked");
+      c.el.textContent = c.sol;
+      setTimeout(()=>{ c.el.classList.remove("pop"); void c.el.offsetWidth; c.el.classList.add("pop"); }, i*45);
+    }
+  });
+  persist();
+  if(celebrate){
+    const num = word.d==="h" ? word.r+1 : word.c+1;
+    toast("✅ " + (word.d==="h" ? "افقی " : "عمودی ") + fa(num) + " حل شد!");
+    haptic("notif","success");
+  }
+  updateWordProgress(); renderDots();
+  if(P.words.every(w=>w.solved)){ setTimeout(puzzleComplete, 650); return; }
+  // auto-select the next unsolved word
+  const next = P.words.find(w=>!w.solved && firstEditable(w));
+  if(next){ selectWord(next, firstEditable(next)); }
+}
+
+/* ================= puzzles & progress ================= */
+function persist(){
+  progress.cur = P ? P.n : 1;
+  if(P) progress.typed[P.n] = typedCells;
+  saveProgress(progress);
+}
+
+function wordSolvedFromTyped(model, t){
+  return model.words.every(w => w.solved) ||
+    model.words.every(w => w.cells.every(c => t[c.r+","+c.c] === c.sol || (t[c.r+","+c.c]===undefined && false)));
+}
+function isPuzzleComplete(n){
+  const m = models[n-1]; if(!m) return false;
+  return m.words.every(w => w.cells.every(c => {
+    const t = (progress.typed[n] || {});
+    return t[c.r+","+c.c] === c.sol;
+  }));
+}
+function isUnlocked(n){
+  if(n <= 1) return true;
+  return isPuzzleComplete(n-1);
+}
+
+function openPuzzle(idx){
+  pIdx = idx;
+  P = models[idx];
+  typedCells = progress.typed[P.n] || {};
+  // silently restore any already-solved words
+  P.words.forEach(w=>{
+    if(w.cells.every(c => typedCells[c.r+","+c.c] === c.sol)){
+      w.solved = true;
+      w.cells.forEach(c=>{ c.locked = true; });
+    }
+  });
+  applyTheme(P.n);
+  renderGrid();
+  updateWordProgress();
+  renderDots();
+  persist();
+  const next = P.words.find(w=>!w.solved && firstEditable(w)) || P.words[0];
+  selectWord(next, firstEditable(next) || next.cells[0]);
+}
+
+function puzzleComplete(){
+  persist(); renderDots();
+  const last = pIdx >= day.puzzles.length-1;
+  const all = day.puzzles.every(p=>isPuzzleComplete(p.n));
+  confetti();
+  haptic("notif","success");
+  $("win-emoji").textContent = all ? "🏆" : "🎉";
+  $("win-title").textContent = all ? "قهرمان جدولک!" : "آفرین!";
+  $("win-sub").textContent = all
+    ? "هر " + fa(day.puzzles.length) + " جدول امروز را حل کردی. فردا جدول‌های تازه می‌آیند! 🌅"
+    : "جدول " + fa(P.n) + " را کامل حل کردی. جدول بعدی باز شد! 🔓";
+  $("btn-next").textContent = all ? "بازگشت به جدول‌ها" : (last ? "بستن" : "جدول بعدی 🚀");
+  $("win").hidden = false;
+}
+
+/* ================= confetti & toast ================= */
+function confetti(){
+  const colors = ["#fbbf24","#f472b6","#34d399","#60a5fa","#a78bfa","#f87171","#fde68a"];
+  for(let i=0;i<30;i++){
+    const el = document.createElement("div"); el.className = "confetti";
+    el.style.left = (2+Math.random()*96)+"vw";
+    el.style.setProperty("--dur", (1.7+Math.random()*1.7)+"s");
+    el.style.setProperty("--delay", (Math.random()*0.6)+"s");
+    el.style.setProperty("--r", Math.floor(Math.random()*360)+"deg");
+    const inner = document.createElement("i");
+    el.style.setProperty("--c", colors[i%colors.length]);
+    el.appendChild(inner);
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 4600);
+  }
+}
+let toastTimer = null;
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2000);
+}
+
+/* ================= sheet (⋮ menu / about / help) ================= */
+function showSheet(section){
+  $("sheet").hidden = false;
+  ["sheet-menu","sheet-about","sheet-help"].forEach(id=>$(id).hidden = true);
+  $(section).hidden = false;
+}
+function hideSheet(){ $("sheet").hidden = true; }
+
+/* ================= boot ================= */
+function show(id){
+  ["gate","no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
+}
+
+async function boot(){
+  tgReady();
+  document.addEventListener("contextmenu", e=>e.preventDefault());
+  const gs = gateState();
+  if(gs === "no-tg"){
+    show("no-tg");
+    $("btn-open-bot").addEventListener("click", ()=>{ location.href = BOT_LINK; });
+    return;
+  }
+  if(gs === "gate"){
+    show("gate");
+    $("btn-join").addEventListener("click", ()=>tgOpen(CHANNEL));
+    $("btn-verify").addEventListener("click", ()=>tgOpen(BOT_LINK + "?start=gate"));
+    return;
+  }
+  show("loading");
+  $("btn-retry").addEventListener("click", ()=>location.reload());
+  const date = tehranDate();
+  day = await fetchDay(date);
+  if(!day || !day.puzzles || !day.puzzles.length){ show("loaderr"); return; }
+  models = day.puzzles.map(p=>buildModel(p, day.date || date));
+  progress = loadProgress();
+  if(!progress || typeof progress !== "object" || progress.cur == null){ progress = {cur:0, typed:{}}; }
+  progress.typed = progress.typed || {};
+
+  renderKeyboard();
+
+  // menu buttons
+  $("btn-menu").addEventListener("click", ()=>showSheet("sheet-menu"));
+  $("sheet-scrim").addEventListener("click", hideSheet);
+  $("m-about").addEventListener("click", ()=>showSheet("sheet-about"));
+  $("m-help").addEventListener("click", ()=>showSheet("sheet-help"));
+  $("about-back").addEventListener("click", ()=>showSheet("sheet-menu"));
+  $("help-back").addEventListener("click", ()=>showSheet("sheet-menu"));
+  $("m-reset").addEventListener("click", ()=>{
+    progress.typed[P.n] = {};
+    typedCells = {};
+    P.words.forEach(w=>{ w.solved=false; w.cells.forEach(c=>c.locked=false); });
+    hideSheet(); openPuzzle(pIdx);
+    toast("🔄 جدول از نو شروع شد");
+  });
+  $("m-wipe").addEventListener("click", ()=>{
+    progress = {cur:0, typed:{}};
+    saveProgress(progress);
+    hideSheet(); openPuzzle(0);
+    toast("🧹 پیشرفت امروز پاک شد");
+  });
+  $("factcaster-link").addEventListener("click", e=>{ e.preventDefault(); tgOpen(ABOUT_LINK); });
+  $("btn-next").addEventListener("click", ()=>{
+    $("win").hidden = true;
+    if(pIdx < day.puzzles.length-1) openPuzzle(pIdx+1);
+  });
+
+  // choose the starting puzzle: saved position if still unlocked,
+  // otherwise the first incomplete unlocked one
+  let start = 0;
+  const saved = +progress.cur || 0;
+  if(saved >= 1 && saved <= day.puzzles.length && isUnlocked(saved)) start = saved-1;
+  else{
+    for(let n=1;n<=day.puzzles.length;n++){
+      if(isUnlocked(n) && !isPuzzleComplete(n)){ start = n-1; break; }
+    }
+  }
+  show("app");
+  openPuzzle(start);
+}
+
+document.addEventListener("DOMContentLoaded", boot);
+
+
+</script>
+</body>
+</html>
