@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0c1230">
 <title>جدولک 🧩</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- bundled locally: telegram.org is unreachable inside Iran without VPN -->
+<script src="telegram-web-app.js"></script>
 <style>
 /* ================= base ================= */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -22,12 +23,13 @@ body{
 }
 #bg{position:fixed;inset:0;z-index:-1;transition:opacity .45s ease}
 #bg.fade{opacity:0}
-button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;position:relative}
 :root{
-  --csz:clamp(34px,calc((100vw - 92px)/8),47px);
+  --csz:40px;          /* cell size — set dynamically */
+  --kh:40px;           /* key height — set dynamically */
+  --kw:39px;           /* key width — set dynamically */
+  --axis:36px;         /* numbers gutter width */
   --gap:3px;
-  --axis:17px;
-  --kh:clamp(35px,6.2vh,46px);
   --radius:14px;
 }
 
@@ -119,82 +121,99 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 @keyframes twinkle{from{opacity:.55}to{opacity:1}}
 
 /* ================= app shell ================= */
-#app{height:100dvh;display:flex;flex-direction:column;padding:8px 8px calc(6px + env(safe-area-inset-bottom));gap:7px;opacity:0;animation:appIn .5s ease .05s forwards}
+#app{height:100dvh;display:flex;flex-direction:column;padding:5px 6px calc(4px + env(safe-area-inset-bottom));gap:6px;opacity:0;animation:appIn .5s ease .05s forwards}
 @keyframes appIn{to{opacity:1}}
 
-.hdr{display:flex;align-items:center;gap:8px;padding:2px 4px;flex:0 0 auto}
-.brand{flex:1;min-width:0}
-.brand h1{font-size:1.15rem;font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.brand small{display:block;font-size:.72rem;color:var(--sub);font-weight:600;margin-top:1px}
-.menu-btn{width:38px;height:38px;border-radius:12px;background:var(--panel);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1.05rem;font-weight:800;transition:transform .15s,background-color .5s}
-.menu-btn:active{transform:scale(.9)}
-
-.dots{display:flex;gap:5px;justify-content:center;flex:0 0 auto;padding:1px 0 0}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--panel);border:1px solid var(--panel-bd);transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer}
-.dot.cur{transform:scale(1.5);border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)}
-.dot.done{background:var(--accent);border-color:var(--accent)}
-.dot.lock{opacity:.38;cursor:default}
-
-/* ================= clue banner ================= */
-.clue-banner{flex:0 0 auto;min-height:56px;display:flex;align-items:center;gap:10px;background:var(--banner);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:9px 13px;box-shadow:0 6px 18px -8px #0005;transition:background-color .5s,border-color .5s}
-.clue-tag{flex:0 0 auto;background:var(--tag);color:var(--tag-ink);font-weight:800;font-size:.92rem;padding:5px 12px;border-radius:999px;white-space:nowrap;box-shadow:inset 0 -2px 0 #0002}
-.clue-text{flex:1;min-width:0;font-size:18px;font-weight:800;line-height:1.6;color:var(--banner-ink);word-break:break-word}
+/* ---- clue banner (top fixed hint bar) ---- */
+.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:var(--banner);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;box-shadow:0 6px 18px -8px #0005;transition:background-color .5s,border-color .5s}
+.clue-tag{flex:0 0 auto;background:var(--tag);color:var(--tag-ink);font-weight:800;font-size:.95rem;padding:5px 12px;border-radius:999px;white-space:nowrap;box-shadow:inset 0 -2px 0 #0002}
+.clue-text{flex:1;min-width:0;font-size:18px;font-weight:800;line-height:1.55;color:var(--banner-ink);word-break:break-word;max-height:56px;overflow-y:auto;overflow-x:hidden}
 .clue-banner.pop .clue-text,.clue-banner.pop .clue-tag{animation:clueIn .32s cubic-bezier(.2,.8,.3,1)}
 @keyframes clueIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .clue-banner.shake{animation:shake .4s}
 @keyframes shake{20%{transform:translateX(6px)}40%{transform:translateX(-6px)}60%{transform:translateX(4px)}80%{transform:translateX(-4px)}}
 
-/* ================= grid ================= */
-.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0}
-.grid-wrap{display:grid;grid-template-columns:var(--axis) repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);padding:2px}
-.axn{display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--sub);opacity:.95}
+/* ---- slim status row (menu + level + dots) ---- */
+.status-row{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:30px;padding:0 2px}
+.menu-btn{width:32px;height:32px;border-radius:10px;background:var(--panel);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1rem;font-weight:800;transition:transform .15s,background-color .5s}
+.menu-btn:active{transform:scale(.88)}
+.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink)}
+.dots{flex:1;display:flex;gap:4px;justify-content:flex-start;overflow:hidden}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--panel);border:1px solid var(--panel-bd);transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
+.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent);animation:dotPulse 2.4s ease-in-out infinite}
+@keyframes dotPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}}
+.dot.done{background:var(--accent);border-color:var(--accent)}
+.dot.lock{opacity:.35;cursor:default}
+.dot.just-unlocked{animation:dotUnlock .7s cubic-bezier(.34,1.56,.64,1)}
+@keyframes dotUnlock{40%{transform:scale(2)}}
+
+/* ---- grid ---- */
+.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden}
+.grid-wrap{display:grid;grid-template-columns:var(--axis) repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px}
+.axn{display:flex;align-items:center;justify-content:flex-start;gap:2px;padding:0 1px;min-width:0}
+.num{min-width:16px;height:16px;padding:0 2px;border-radius:5px;background:var(--panel);border:1px solid var(--panel-bd);font-size:9.5px;font-weight:800;color:var(--sub);display:grid;place-items:center;transition:transform .25s cubic-bezier(.34,1.56,.64,1),background-color .25s,border-color .25s;line-height:1}
+.num.on{background:var(--accent);color:var(--accent-ink);border-color:transparent;transform:scale(1.3)}
 .cell{width:var(--csz);height:var(--csz);background:var(--cell);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
 .cell.void{background:var(--void);border-color:transparent;cursor:default}
 .cell.hl{background:var(--hl)}
 .cell.cur{border-color:var(--hl-cur);box-shadow:0 0 0 2px var(--hl-cur) inset;background:var(--hl)}
+.cell.origin::before{content:"";position:absolute;top:2px;right:2px;width:0;height:0;border-top:7px solid var(--hl-cur);border-left:7px solid transparent;opacity:.9;pointer-events:none}
 .cell.locked{background:var(--ok);border-color:var(--ok-bd);color:var(--cell-ink)}
 .cell span{pointer-events:none;animation:letterIn .16s cubic-bezier(.2,.8,.3,1.4)}
 @keyframes letterIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
 .cell.pop{animation:cellPop .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes cellPop{50%{transform:scale(1.13)}}
+.cell.flip{animation:flipIn .5s ease both}
+@keyframes flipIn{0%{transform:rotateX(0)}45%{transform:rotateX(88deg)}55%{transform:rotateX(-88deg)}100%{transform:rotateX(0)}}
 .grid-wrap.entrance .cell{animation:cellIn .4s both cubic-bezier(.2,.8,.3,1)}
 @keyframes cellIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
 .word-sweep{position:relative;overflow:hidden}
 .word-sweep::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 20%,#ffffffb8 50%,transparent 80%);animation:sweep .55s ease}
 @keyframes sweep{from{transform:translateX(120%)}to{transform:translateX(-120%)}}
 
-/* ================= word progress ================= */
-.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:var(--sub)}
+/* ---- word progress ---- */
+.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:var(--sub);min-height:18px}
 .wbar{flex:1;height:6px;border-radius:99px;background:var(--panel);border:1px solid var(--panel-bd);overflow:hidden}
-.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--hl-cur));transition:width .5s cubic-bezier(.2,.8,.3,1)}
+.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--hl-cur),var(--accent));background-size:200% 100%;transition:width .5s cubic-bezier(.2,.8,.3,1);animation:shimmer 2.6s linear infinite}
+@keyframes shimmer{to{background-position:-200% 0}}
 
-/* ================= keyboard ================= */
-.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:4px 2px 0}
-.krow{display:flex;gap:6px;justify-content:center}
-.key{width:clamp(34px,calc((100vw - 76px)/8),46px);height:var(--kh);background:var(--kbd);border:1px solid var(--kbd-bd);border-radius:11px;font-size:1.06rem;font-weight:700;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:0 2px 0 #00000022,inset 0 1px 0 #ffffff30;transition:transform .09s,filter .09s,background-color .5s;cursor:pointer}
+/* ---- keyboard ---- */
+.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;padding:2px 2px 0}
+.krow{display:flex;gap:5px;justify-content:center}
+.key{width:var(--kw);height:var(--kh);background:var(--kbd);border:1px solid var(--kbd-bd);border-radius:11px;font-size:calc(var(--kh)*.5);font-weight:700;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:0 2px 0 #00000022,inset 0 1px 0 #ffffff30;transition:transform .09s,filter .09s,background-color .5s;cursor:pointer;overflow:hidden}
+.key::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;transform:scale(.4);pointer-events:none}
 .key:active,.key.pressed{transform:scale(.86) translateY(2px);filter:brightness(1.18);box-shadow:0 0 0 #00000022}
-.key.bk{flex:1;max-width:calc(clamp(34px,calc((100vw - 76px)/8),46px)*3);font-size:.92rem;gap:7px;display:flex;align-items:center;justify-content:center}
+.key.pressed::after{animation:ripple .32s ease-out}
+@keyframes ripple{from{opacity:.22;transform:scale(.4)}to{opacity:0;transform:scale(1.2)}}
+.key.bk{flex:1;width:auto;font-size:.92rem;gap:7px;display:flex;align-items:center;justify-content:center}
 .key.bk svg{width:20px;height:20px;fill:currentColor}
 
 /* ================= full screens (gate / loading / error) ================= */
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:26px;text-align:center;z-index:50}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;padding:26px;text-align:center;z-index:50}
 .screen[hidden]{display:none}
-.logo{font-size:3.4rem;animation:logoFloat 3s ease-in-out infinite}
+.screen>*{animation:riseIn .55s both cubic-bezier(.2,.8,.3,1)}
+.screen>*:nth-child(1){animation-delay:.05s}
+.screen>*:nth-child(2){animation-delay:.13s}
+.screen>*:nth-child(3){animation-delay:.21s}
+.screen>*:nth-child(4){animation-delay:.29s}
+.screen>*:nth-child(5){animation-delay:.37s}
+.screen>*:nth-child(6){animation-delay:.45s}
+@keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.logo{font-size:3.1rem;animation:logoFloat 3s ease-in-out infinite}
 @keyframes logoFloat{50%{transform:translateY(-9px) rotate(-4deg)}}
 .screen h2{font-size:1.5rem;font-weight:800}
 .screen p{font-size:.95rem;line-height:1.9;color:var(--sub);font-weight:600;max-width:330px}
-.btn{background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 6px 16px -6px #0006;transition:transform .15s,filter .15s;min-width:230px}
+.btn{background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 6px 16px -6px #0006;transition:transform .15s,filter .15s;min-width:240px}
 .btn:active{transform:scale(.95)}
 .btn.ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:none}
+.btn.busy{pointer-events:none;filter:saturate(.6) brightness(.9)}
 .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--panel-bd);border-top-color:var(--accent);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.pulse-tip{animation:pulseTip 2s ease-in-out infinite}
-@keyframes pulseTip{50%{opacity:.55}}
 
 /* ================= bottom sheet (⋮ menu / about / help) ================= */
 #sheet{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-end;justify-content:center}
 #sheet[hidden]{display:none}
-#sheet .scrim{position:absolute;inset:0;background:#00000073;backdrop-filter:none;animation:fadeIn .25s}
+#sheet .scrim{position:absolute;inset:0;background:#00000073;animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0}}
 #sheet .card{position:relative;width:min(430px,100%);background:var(--panel);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
 @keyframes sheetUp{from{transform:translateY(60%);opacity:.4}}
@@ -204,8 +223,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 #sheet .row:active{background:#ffffff1a}
 #sheet .row .ic{font-size:1.25rem;width:26px;text-align:center}
 #sheet .divider{height:1px;background:var(--panel-bd);margin:7px 0}
-#sheet .about-text{font-size:1.02rem;font-weight:800;line-height:2;padding:8px 4px 2px}
-#sheet .about-text a{color:var(--accent);text-decoration:none}
+#sheet .about-text{font-size:1.05rem;font-weight:800;line-height:2;padding:8px 4px 2px}
+#sheet .about-text a{color:var(--accent);text-decoration:none;direction:ltr;unicode-bidi:isolate;display:inline-block;font-weight:800}
+#sheet .about-text a:active{opacity:.7}
 #sheet .ver{font-size:.75rem;color:var(--sub);margin-top:10px;text-align:center}
 #sheet .help-body{font-size:.92rem;line-height:2.1;font-weight:600;color:var(--ink);padding:4px 2px}
 
@@ -213,7 +233,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 #win{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#000000a6}
 #win[hidden]{display:none}
 #win .card{width:min(360px,88vw);background:var(--panel);border:1.5px solid var(--panel-bd);border-radius:24px;padding:30px 24px;text-align:center;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
-@keyframes winIn{from{transform:scale(.55);opacity:0}}
+@keyframes winIn{from{transform:scale(.55) translateY(30px);opacity:0}}
 #win .big{font-size:3.2rem;animation:logoFloat 2.6s ease-in-out infinite}
 #win h2{font-size:1.45rem;font-weight:900;margin:6px 0 4px}
 #win p{font-size:.9rem;color:var(--sub);font-weight:600;line-height:1.9}
@@ -223,32 +243,39 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 @keyframes confFall{3%{opacity:1}to{transform:translateY(112vh);opacity:0}}
 @keyframes confSpin{to{transform:rotate(calc(var(--r,0deg) + 540deg))}}
 
+/* ================= level-change wipe ================= */
+#wipe{position:fixed;inset:0;z-index:70;pointer-events:none;opacity:0;background:var(--bg1,#333)}
+#wipe.cover{animation:wipeCover .34s ease-in forwards}
+#wipe.reveal{animation:wipeReveal .4s ease-out forwards}
+@keyframes wipeCover{from{opacity:1;clip-path:circle(0% at 50% 44%)}to{opacity:1;clip-path:circle(120% at 50% 44%)}}
+@keyframes wipeReveal{from{opacity:1;clip-path:circle(120% at 50% 44%)}to{opacity:0;clip-path:circle(120% at 50% 44%)}}
+
 /* ================= toast ================= */
-#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:var(--panel);border:1.5px solid var(--ok-bd);color:var(--ink);font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 10px 26px -8px #000a;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:var(--panel);border:1.5px solid var(--ok-bd);color:var(--ink);font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 10px 26px -8px #000a;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;max-width:88vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(50%) translateY(4px)}
 
-/* tiny screens: shrink banner font a bit */
+/* tiny screens */
 @media (max-height:640px){
-  .clue-text{font-size:16px}
-  :root{--kh:clamp(32px,5.6vh,42px);--csz:clamp(31px,calc((100vw - 88px)/8),42px)}
+  .clue-banner{height:62px}
+  .clue-text{font-size:16px;max-height:48px}
+  :root{--axis:32px}
 }
-/* very long clue: keep grid visible, banner scrolls after 3 lines */
-.clue-text{max-height:5.1em;overflow:auto}
-
-
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
+}
 </style>
 </head>
 <body class="theme-1">
 <div id="bg"></div>
+<div id="wipe"></div>
+
 <!-- ============ gate screen (join the channel first) ============ -->
 <div id="gate" class="screen" hidden>
   <div class="logo">🧩</div>
   <h2>جدولک</h2>
-  <p id="gate-msg">برای بازی با جدول‌های روزانه، اول عضو کانال
-  <b>دانشنامهٔ علمی</b> شو؛ بعد از تایید عضویت، بازی برایت باز می‌شود.</p>
+  <p>برای بازی با جدول‌های روزانه، اول عضو کانال <b>دانشنامهٔ علمی</b> شو؛ بعد عضویتت بررسی می‌شود.</p>
   <button class="btn" id="btn-join">📢 عضویت در @daily_sciences</button>
-  <button class="btn ghost" id="btn-verify">✅ عضو شدم، ورود به بازی</button>
-  <p class="pulse-tip" style="font-size:.78rem">اگر عضویت را لغو کرده باشی، برای بازگشت دوباره عضو شو.</p>
+  <button class="btn ghost" id="btn-verify">✅ عضو شدم، ادامه بده</button>
 </div>
 
 <!-- ============ not inside telegram ============ -->
@@ -267,29 +294,23 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 <div id="loaderr" class="screen" hidden>
   <div class="logo">📡</div>
   <h2>جدول‌های امروز هنوز آماده نشده‌اند</h2>
-  <p>کمی بعد دوباره تلاش می‌کنیم. اگر مشکل اتصال داری، اینترنت یا پروکسی‌ات را بررسی کن.</p>
+  <p>کمی بعد دوباره تلاش می‌کنیم. اگر مشکل اتصال داری، اینترنت‌ات را بررسی کن.</p>
   <button class="btn" id="btn-retry">🔄 تلاش مجدد</button>
 </div>
 
 <!-- ============ main app ============ -->
 <div id="app" hidden>
-  <header class="hdr">
-    <button class="menu-btn" id="btn-menu" aria-label="منو">⋮</button>
-    <div class="brand">
-      <h1>🧩 جدولک</h1>
-      <small id="lvl-label">جدول ۱ از ۱۰</small>
-    </div>
-    <div style="width:38px"></div>
-  </header>
-  <div class="dots" id="dots"></div>
   <div class="clue-banner" id="banner">
     <span class="clue-tag" id="clue-tag">افقی ۱</span>
     <span class="clue-text" id="clue-text">…</span>
   </div>
-  <div class="grid-zone"><div class="grid-wrap" id="grid-wrap">
-    <div class="axn"></div><!-- corner -->
-  </div></div>
-  <div class="wprog">
+  <div class="status-row" id="status-row">
+    <button class="menu-btn" id="btn-menu" aria-label="منو">⋮</button>
+    <span class="lvl-label" id="lvl-label">جدول ۱ از ۱۰</span>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="grid-zone"><div class="grid-wrap" id="grid-wrap"></div></div>
+  <div class="wprog" id="wprog">
     <span id="wcount">۰ از ۰ واژه</span>
     <div class="wbar"><i id="wbar-i"></i></div>
   </div>
@@ -303,6 +324,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
     <div class="grab"></div>
     <div id="sheet-menu">
       <h3>منوی جدولک</h3>
+      <button class="row" id="m-share"><span class="ic">📤</span> دعوت از دوستان</button>
       <button class="row" id="m-about"><span class="ic">ℹ️</span> درباره جدولک</button>
       <button class="row" id="m-help"><span class="ic">📖</span> راهنمای بازی</button>
       <div class="divider"></div>
@@ -311,7 +333,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
     </div>
     <div id="sheet-about" hidden>
       <h3>درباره جدولک</h3>
-      <p class="about-text">طراحی، ساخت و اجرا توسط <a id="factcaster-link" href="#">@factcaster</a></p>
+      <p class="about-text">طراح و سازنده <a id="factcaster-link" dir="ltr" href="https://t.me/factcaster">@factcaster</a></p>
       <p style="font-size:.85rem;color:var(--sub);line-height:2;font-weight:600">
         جدول‌های تازه هر روز با هوش مصنوعی ساخته و با دقت الگوریتمی بررسی می‌شوند.</p>
       <div class="divider"></div>
@@ -320,17 +342,17 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
     <div id="sheet-help" hidden>
       <h3>راهنمای بازی</h3>
       <div class="help-body">
+        • هر روز ۱۰ جدول تازه فارسی دریافت می‌شود.<br>
         • با لمس هر خانه، واژهٔ <b>افقی</b> آن انتخاب می‌شود؛ با لمس دوبارهٔ همان خانه، جهت به <b>عمودی</b> تغییر می‌کند.<br>
         • با کیبورد داخل بازی، حرف‌ها را تایپ کن؛ بعد از هر حرف به خانهٔ بعد می‌روی.<br>
         • کلید «پاک‌کردن» حرف را حذف می‌کند و به خانهٔ قبلی برمی‌گردد.<br>
         • هر واژهٔ کامل‌شده قفل می‌شود و سبز رنگ می‌شود.<br>
-        • جدول بعدی فقط بعد از حل جدول فعلی باز می‌شود.<br>
-        • تم صفحه در هر جدول عوض می‌شود؛ جدول سوم در صفحهٔ روزنامه است! 📰
+        • جدول بعدی فقط بعد از حل جدول فعلی باز می‌شود.
       </div>
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۱٫۰</div>
+    <div class="ver">جدولک نسخه ۱٫۱</div>
   </div>
 </div>
 
@@ -353,6 +375,8 @@ const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : 
 const CHANNEL = "https://t.me/daily_sciences";
 const BOT_LINK = "https://t.me/jadvalak_bot";
 const ABOUT_LINK = "https://t.me/factcaster";
+const SHARE_URL = "https://t.me/share/url?url=" + encodeURIComponent(BOT_LINK) +
+  "&text=" + encodeURIComponent("🧩 جدولک — هر روز ۱۰ جدول کلمات متقاطع فارسی! بیا بازی کنیم 🎮");
 
 function tgReady(){
   try{ TG && TG.ready(); }catch(e){}
@@ -372,14 +396,11 @@ function tgOpen(url){ try{ TG && TG.openTelegramLink ? TG.openTelegramLink(url) 
 const $ = id => document.getElementById(id);
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const fa = n => String(n).replace(/\d/g, d => FA_DIGITS[+d]);
-const KEY = { // the 32-letter Persian keyboard (4 rows of 8)
-  rows: [
-    ["ض","ص","ث","ق","ف","غ","ع","ه"],
-    ["خ","ح","ج","چ","ش","س","ی","ب"],
-    ["ظ","ط","ز","ر","ذ","د","ژ","پ"],
-    ["ل","ا","ت","ن","م","ک","گ","و"],
-  ]
-};
+/* the 32-letter Persian alphabet — DICTIONARY order, 4 rows of 8 */
+const ALPHABET = ["ا","ب","پ","ت","ث","ج","چ","ح","خ","د","ذ","ر","ز","ژ","س","ش",
+                  "ص","ض","ط","ظ","ع","غ","ف","ق","ک","گ","ل","م","ن","و","ه","ی"];
+const KEY_ROWS = [ALPHABET.slice(0,8), ALPHABET.slice(8,16),
+                  ALPHABET.slice(16,24), ALPHABET.slice(24,32)];
 const SIZE = 8;
 
 function tehranDate(){
@@ -389,6 +410,13 @@ function tehranDate(){
     const d = new Date(Date.now() + 3.5*3600*1000);
     return d.toISOString().slice(0,10);
   }
+}
+function yesterdayOf(date){
+  try{
+    const d = new Date(date + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate()-1);
+    return d.toISOString().slice(0,10);
+  }catch(e){ return date; }
 }
 
 /* XOR+base64 answer decoder (light obfuscation of the day file) */
@@ -422,39 +450,86 @@ function gateState(){
 }
 function userId(){ const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user; return u && u.id ? u.id : 0; }
 
-/* ================= progress persistence ================= */
+/* ================= progress persistence (localStorage + Telegram CloudStorage) ================= */
 function progressKey(){ return "jk:" + userId() + ":" + tehranDate(); }
-function loadProgress(){
-  try{ return JSON.parse(localStorage.getItem(progressKey())) || {}; }catch(e){ return {}; }
+function csGet(key){
+  return new Promise(res=>{
+    let done = false;
+    const t = setTimeout(()=>{ if(!done){ done=true; res(null); } }, 1200);
+    try{
+      TG.CloudStorage.getItem(key, (err, val)=>{
+        if(done) return; done = true; clearTimeout(t);
+        res(err ? null : (val || null));
+      });
+    }catch(e){ if(!done){ done=true; clearTimeout(t); res(null); } }
+  });
+}
+function csSet(key, val){
+  try{ TG.CloudStorage.setItem(key, val, ()=>{}); }catch(e){}
+}
+async function loadProgress(){
+  const key = progressKey();
+  try{
+    const local = JSON.parse(localStorage.getItem(key));
+    if(local && typeof local === "object") return local;
+  }catch(e){}
+  const cloud = await csGet(key);
+  try{
+    if(cloud){
+      const obj = JSON.parse(cloud);
+      if(obj && typeof obj === "object") return obj;
+    }
+  }catch(e){}
+  return null;
 }
 function saveProgress(p){
-  try{ localStorage.setItem(progressKey(), JSON.stringify(p)); }catch(e){}
+  const key = progressKey();
+  try{ localStorage.setItem(key, JSON.stringify(p)); }catch(e){}
+  csSet(key, JSON.stringify(p));
 }
 
 /* ================= day data ================= */
+async function fetchJson(path){
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), 12000);
+  try{
+    const res = await fetch(path, {cache:"no-store", signal:ctrl.signal});
+    clearTimeout(t);
+    if(res.ok) return await res.json();
+    if(res.status === 404) return "404";
+    return null;
+  }catch(e){ clearTimeout(t); return null; }
+}
 async function fetchDay(date){
   const cacheKey = "jk:data:" + date;
   for(let attempt=0; attempt<3; attempt++){
-    try{
-      const ctrl = new AbortController();
-      const t = setTimeout(()=>ctrl.abort(), 15000);
-      const res = await fetch("data/" + date + ".json", {cache:"no-store", signal:ctrl.signal});
-      clearTimeout(t);
-      if(res.ok){
-        const data = await res.json();
-        try{ localStorage.setItem(cacheKey, JSON.stringify(data)); }catch(e){}
-        return data;
-      }
-      if(res.status === 404) break;
-    }catch(e){}
-    await new Promise(r=>setTimeout(r, 1500));
+    const data = await fetchJson("data/" + date + ".json");
+    if(data && data !== "404"){
+      try{ localStorage.setItem(cacheKey, JSON.stringify(data)); }catch(e){}
+      return {data, fallback:false};
+    }
+    if(data === "404") break;          // file not published yet
+    await new Promise(r=>setTimeout(r, 1200));  // network hiccup — retry
   }
-  try{ const cached = localStorage.getItem(cacheKey); if(cached) return JSON.parse(cached); }catch(e){}
+  /* today's file not ready: fall back to yesterday so the game always opens */
+  const ydate = yesterdayOf(date);
+  const ydata = await fetchJson("data/" + ydate + ".json");
+  if(ydata && ydata !== "404"){
+    try{ localStorage.setItem("jk:data:"+ydate, JSON.stringify(ydata)); }catch(e){}
+    return {data:ydata, fallback:true};
+  }
+  /* last resort: cached copy from an earlier session */
+  try{
+    for(const k of [cacheKey, "jk:data:"+ydate]){
+      const cached = localStorage.getItem(k);
+      if(cached) return {data:JSON.parse(cached), fallback: k!==cacheKey};
+    }
+  }catch(e){}
   return null;
 }
 
-/* ================= puzzle model ================= */
-/* words: [{w,r,c,d,clue}] -> cells map + word objects */
+/* ================= puzzle model + crossword numbering ================= */
+/* words: [{w,r,c,d,clue}] -> cells map + word objects with proper numbers */
 function buildModel(puzzle, date){
   const cells = {};   // "r,c" -> {r,c,sol,h,v,locked,el}
   const words = puzzle.words.map(raw => {
@@ -469,29 +544,92 @@ function buildModel(puzzle, date){
     }
     return w;
   });
-  return { n: puzzle.n, words, cells };
+  /* standard crossword numbering: scan reading order (RTL rows), a shared
+     number per start cell; numbers live OUTSIDE the grid in the gutter */
+  const startMap = new Map();  // "r,c" -> {r,c,h,v}
+  for(const w of words){
+    const k = w.r+","+w.c;
+    if(!startMap.has(k)) startMap.set(k, {r:w.r, c:w.c, h:null, v:null});
+    const s = startMap.get(k);
+    if(w.d==="h") s.h = w; else s.v = w;
+  }
+  const starts = [...startMap.values()].sort((a,b)=> a.r-b.r || a.c-b.c);
+  const rowBadges = new Map();  // row -> [{n, c}]  (badge per grid row)
+  starts.forEach((s, i)=>{
+    const n = i+1;
+    if(s.h) s.h.num = n;
+    if(s.v) s.v.num = n;
+    if(!rowBadges.has(s.r)) rowBadges.set(s.r, []);
+    rowBadges.get(s.r).push({n, c: s.c});
+  });
+  for(const [r, list] of rowBadges) rowBadges.set(r, list.sort((a,b)=>a.c-b.c));
+  return { n: puzzle.n, words, cells, rowBadges };
 }
 
 /* ================= global state ================= */
 let day = null, models = [], pIdx = 0, P = null, cur = null;
 let typedCells = {};          // "r,c" -> letter  (current puzzle)
 let progress = {cur:0, typed:{}};
+let completeCache = {};       // puzzle n -> bool
 const THEME_HEAD = {1:"#0c1230",2:"#8ec9ff",3:"#efe9dc",4:"#e8f5e0",5:"#a9764f",
                     6:"#0e5f6e",7:"#f2dcae",8:"#0a0a12",9:"#2a1b4d",10:"#f7d774"};
+
+/* ================= dynamic layout (grid + keyboard ALWAYS fit) ================= */
+function layout(){
+  if($("app").hidden) return;
+  const vw = document.documentElement.clientWidth;
+  let vh = window.innerHeight;
+  try{ if(TG && TG.viewportStableHeight) vh = TG.viewportStableHeight; }catch(e){}
+  const banner = $("banner").offsetHeight || 74;
+  const status = $("status-row").offsetHeight || 30;
+  const wprog = $("wprog").offsetHeight || 18;
+  const appCS = getComputedStyle($("app"));
+  const padV = (parseFloat(appCS.paddingTop)||5) + (parseFloat(appCS.paddingBottom)||4); // includes safe-area inset
+  const gapV = (parseFloat(appCS.rowGap)||6) * 4;   // gaps between the 5 sections
+  const kbdChrome = 2 + 4*5;          // kbd top pad + 5px gaps * 4 between rows
+  const gridGaps = 7 * 3;
+  const avail = vh - banner - status - wprog - padV - gapV;
+  let kh = Math.floor((avail * 0.40 - kbdChrome) / 5);
+  let csz = Math.floor(Math.min((avail * 0.60 - gridGaps) / 8,
+                                (vw - 12 - 36 - 7*3) / 8));
+  kh = Math.max(28, Math.min(48, kh));
+  csz = Math.max(26, Math.min(47, csz));
+  /* give leftovers to whichever is starving */
+  const used = csz*8 + gridGaps + kh*5 + kbdChrome;
+  if(avail - used > 3){
+    const extra = avail - used;
+    csz = Math.min(47, csz + Math.floor(extra*0.55/8));
+    kh = Math.min(52, kh + Math.floor(extra*0.45/5));
+  }
+  const rs = document.documentElement.style;
+  rs.setProperty("--csz", csz+"px");
+  rs.setProperty("--kh", kh+"px");
+  rs.setProperty("--kw", Math.floor((vw - 12 - 7*5)/8)+"px");
+}
+let layoutRaf = 0;
+function scheduleLayout(){
+  if(layoutRaf) return;
+  layoutRaf = requestAnimationFrame(()=>{ layoutRaf = 0; layout(); });
+}
+window.addEventListener("resize", scheduleLayout);
+window.addEventListener("orientationchange", ()=>setTimeout(layout, 250));
+try{ TG && TG.onEvent && TG.onEvent("viewportChanged", scheduleLayout); }catch(e){}
 
 /* ================= rendering ================= */
 function renderGrid(){
   const wrap = $("grid-wrap");
   wrap.innerHTML = "";
-  // top axis: corner + column numbers ۱..۸ (۱ = rightmost)
-  wrap.appendChild(Object.assign(document.createElement("div"),{className:"axn"}));
-  for(let c=0;c<SIZE;c++){
-    const d = document.createElement("div"); d.className="axn"; d.textContent = fa(c+1);
-    wrap.appendChild(d);
-  }
+  P.badgeEls = {};
   for(let r=0;r<SIZE;r++){
-    const rn = document.createElement("div"); rn.className="axn"; rn.textContent = fa(r+1);
-    wrap.appendChild(rn);
+    /* numbers gutter (outside the grid, right side in RTL) */
+    const gut = document.createElement("div"); gut.className="axn";
+    (P.rowBadges.get(r) || []).forEach(b=>{
+      const el = document.createElement("span");
+      el.className = "num"; el.textContent = fa(b.n);
+      P.badgeEls[b.n] = el;
+      gut.appendChild(el);
+    });
+    wrap.appendChild(gut);
     for(let c=0;c<SIZE;c++){
       const cell = P.cells[r+","+c];
       const d = document.createElement("div");
@@ -515,7 +653,7 @@ function renderGrid(){
 function renderKeyboard(){
   const kbd = $("kbd");
   kbd.innerHTML = "";
-  KEY.rows.forEach(row=>{
+  KEY_ROWS.forEach(row=>{
     const rEl = document.createElement("div"); rEl.className="krow";
     row.forEach(ch=>{
       const k = document.createElement("button"); k.className="key"; k.textContent = ch;
@@ -533,7 +671,7 @@ function renderKeyboard(){
 }
 function pressFx(el){
   el.classList.add("pressed");
-  setTimeout(()=>el.classList.remove("pressed"), 110);
+  setTimeout(()=>el.classList.remove("pressed"), 130);
   haptic("impact","light");
 }
 
@@ -552,7 +690,7 @@ function renderDots(){
     d.className = "dot" + (done ? " done" : "") + (unlocked ? "" : " lock") + (i===pIdx ? " cur" : "");
     d.title = "جدول " + fa(p.n);
     d.addEventListener("pointerdown", ()=>{
-      if(!isUnlocked(p.n)){ toast("🔒 اول جدول قبلی را حل کن!"); return; }
+      if(!isUnlocked(p.n)){ toast("🔒 اول جدول قبلی را حل کن!"); haptic("notif","error"); return; }
       if(i!==pIdx) openPuzzle(i);
     });
     box.appendChild(d);
@@ -562,18 +700,23 @@ function renderDots(){
 function updateBanner(){
   if(!cur) return;
   const w = cur.word;
-  const num = w.d==="h" ? w.r+1 : w.c+1;
-  $("clue-tag").textContent = (w.d==="h" ? "افقی " : "عمودی ") + fa(num);
+  $("clue-tag").textContent = (w.d==="h" ? "افقی " : "عمودی ") + fa(w.num || 1);
   $("clue-text").textContent = w.clue || "…";
+  $("clue-text").scrollTop = 0;
   const b = $("banner");
   b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
 }
 
 function updateHighlights(){
-  document.querySelectorAll(".cell.hl").forEach(el=>el.classList.remove("hl","cur"));
+  document.querySelectorAll(".cell.hl,.cell.cur,.cell.origin").forEach(el=>el.classList.remove("hl","cur","origin"));
+  document.querySelectorAll(".num.on").forEach(el=>el.classList.remove("on"));
   if(!cur) return;
   cur.word.cells.forEach(c=>{ if(c.el) c.el.classList.add("hl"); });
+  const start = cur.word.cells[0];
+  if(start && start.el) start.el.classList.add("origin");
   if(cur.cell.el) cur.cell.el.classList.add("cur");
+  const badge = P.badgeEls[cur.word.num];
+  if(badge) badge.classList.add("on");
 }
 
 function updateWordProgress(){
@@ -583,20 +726,35 @@ function updateWordProgress(){
   $("lvl-label").textContent = "جدول " + fa(P.n) + " از " + fa(day.puzzles.length);
 }
 
-function applyTheme(n){
+/* ================= theme with circular wipe ================= */
+function applyTheme(n, instant){
   const idx = ((n-1)%10)+1;
   const cls = "theme-"+idx;
   const head = THEME_HEAD[idx];
-  const bg = $("bg");
-  bg.classList.add("fade");
+  if(instant){
+    document.body.className = cls;
+    setTgColors(head);
+    return;
+  }
+  const wipe = $("wipe");
+  wipe.style.background = head;
+  wipe.classList.remove("cover","reveal");
+  void wipe.offsetWidth;
+  wipe.classList.add("cover");
   setTimeout(()=>{
     document.body.className = cls;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if(meta) meta.setAttribute("content", head);
-    try{ TG && TG.setHeaderColor && TG.setHeaderColor(head); }catch(e){}
-    try{ TG && TG.setBackgroundColor && TG.setBackgroundColor(head); }catch(e){}
-    bg.classList.remove("fade");
-  }, 220);
+    setTgColors(head);
+    wipe.classList.remove("cover");
+    void wipe.offsetWidth;
+    wipe.classList.add("reveal");
+    setTimeout(()=>wipe.classList.remove("reveal"), 450);
+  }, 340);
+}
+function setTgColors(head){
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content", head);
+  try{ TG && TG.setHeaderColor && TG.setHeaderColor(head); }catch(e){}
+  try{ TG && TG.setBackgroundColor && TG.setBackgroundColor(head); }catch(e){}
 }
 
 /* ================= selection & input ================= */
@@ -606,13 +764,13 @@ function selectWord(word, cell){
 }
 
 function tapCell(cell){
-  if(!cell || cell.locked && !cell.h && !cell.v) return;
+  if(!cell || (cell.locked && !cell.h && !cell.v)) return;
   if(cur && cur.cell === cell){
-    // second tap on the same cell -> switch direction
+    /* second tap on the same cell -> switch direction */
     const other = cur.dir === "h" ? cell.v : cell.h;
     if(other && other !== cur.word){ haptic("impact","medium"); selectWord(other, cell); return; }
   }
-  const w = (cur && cur.cell === cell) ? cur.word : (cell.h || cell.v);
+  const w = cell.h || cell.v;
   if(w){ haptic("impact","light"); selectWord(w, cell); }
 }
 
@@ -627,7 +785,6 @@ function advance(){
   for(let i=idx+1;i<cur.word.cells.length;i++){
     if(!cur.word.cells[i].locked){ cur.cell = cur.word.cells[i]; updateHighlights(); return; }
   }
-  // stay on the last cell
 }
 
 function typeLetter(ch){
@@ -637,7 +794,7 @@ function typeLetter(ch){
   renderCellLetter(cur.cell, ch);
   haptic("impact","light");
   persist();
-  if(wordSolved(cur.word)){ lockWord(cur.word, true); return; }
+  if(wordSolved(cur.word)){ lockWord(cur.word); return; }
   if(wordFilled(cur.word)) shakeBanner();
   advance();
 }
@@ -652,7 +809,7 @@ function backspace(){
     persist();
     return;
   }
-  // auto-return to the previous cell of the word
+  /* auto-return to the previous cell of the word */
   const idx = cur.word.cells.indexOf(cur.cell);
   for(let i=idx-1;i>=0;i--){
     const prev = cur.word.cells[i];
@@ -674,9 +831,10 @@ function wordSolved(word){
 function shakeBanner(){
   const b = $("banner");
   b.classList.remove("shake"); void b.offsetWidth; b.classList.add("shake");
+  haptic("notif","error");
 }
 
-function lockWord(word, celebrate){
+function lockWord(word){
   word.solved = true;
   word.cells.forEach((c,i)=>{
     c.locked = true;
@@ -684,18 +842,20 @@ function lockWord(word, celebrate){
     if(c.el){
       c.el.classList.add("locked");
       c.el.textContent = c.sol;
-      setTimeout(()=>{ c.el.classList.remove("pop"); void c.el.offsetWidth; c.el.classList.add("pop"); }, i*45);
+      /* cascade flip celebration, staggered per cell */
+      c.el.classList.remove("flip"); void c.el.offsetWidth;
+      setTimeout(()=>{ c.el.classList.add("flip"); }, i*70);
+      setTimeout(()=>{ c.el.classList.remove("flip"); }, i*70 + 560);
     }
   });
+  const startEl = word.cells[0] && word.cells[0].el;
+  if(startEl){ startEl.classList.add("word-sweep"); setTimeout(()=>startEl.classList.remove("word-sweep"), 600); }
   persist();
-  if(celebrate){
-    const num = word.d==="h" ? word.r+1 : word.c+1;
-    toast("✅ " + (word.d==="h" ? "افقی " : "عمودی ") + fa(num) + " حل شد!");
-    haptic("notif","success");
-  }
+  toast("✅ " + (word.d==="h" ? "افقی " : "عمودی ") + fa(word.num) + " حل شد!");
+  haptic("notif","success");
   updateWordProgress(); renderDots();
-  if(P.words.every(w=>w.solved)){ setTimeout(puzzleComplete, 650); return; }
-  // auto-select the next unsolved word
+  if(P.words.every(w=>w.solved)){ setTimeout(puzzleComplete, 800); return; }
+  /* auto-select the next unsolved word */
   const next = P.words.find(w=>!w.solved && firstEditable(w));
   if(next){ selectWord(next, firstEditable(next)); }
 }
@@ -707,16 +867,13 @@ function persist(){
   saveProgress(progress);
 }
 
-function wordSolvedFromTyped(model, t){
-  return model.words.every(w => w.solved) ||
-    model.words.every(w => w.cells.every(c => t[c.r+","+c.c] === c.sol || (t[c.r+","+c.c]===undefined && false)));
-}
 function isPuzzleComplete(n){
+  if(completeCache[n] !== undefined) return completeCache[n];
   const m = models[n-1]; if(!m) return false;
-  return m.words.every(w => w.cells.every(c => {
-    const t = (progress.typed[n] || {});
-    return t[c.r+","+c.c] === c.sol;
-  }));
+  const t = progress.typed[n] || {};
+  const ok = m.words.every(w => w.cells.every(c => t[c.r+","+c.c] === c.sol));
+  if(ok) completeCache[n] = true;
+  return ok;
 }
 function isUnlocked(n){
   if(n <= 1) return true;
@@ -727,27 +884,29 @@ function openPuzzle(idx){
   pIdx = idx;
   P = models[idx];
   typedCells = progress.typed[P.n] || {};
-  // silently restore any already-solved words
+  /* silently restore any already-solved words */
   P.words.forEach(w=>{
     if(w.cells.every(c => typedCells[c.r+","+c.c] === c.sol)){
       w.solved = true;
       w.cells.forEach(c=>{ c.locked = true; });
     }
   });
-  applyTheme(P.n);
+  applyTheme(P.n, !document.body.className || document.body.className === "theme-1" && idx === 0);
   renderGrid();
   updateWordProgress();
   renderDots();
   persist();
   const next = P.words.find(w=>!w.solved && firstEditable(w)) || P.words[0];
   selectWord(next, firstEditable(next) || next.cells[0]);
+  scheduleLayout();
 }
 
 function puzzleComplete(){
   persist(); renderDots();
   const last = pIdx >= day.puzzles.length-1;
   const all = day.puzzles.every(p=>isPuzzleComplete(p.n));
-  confetti();
+  confetti(46);
+  setTimeout(()=>confetti(24), 500);
   haptic("notif","success");
   $("win-emoji").textContent = all ? "🏆" : "🎉";
   $("win-title").textContent = all ? "قهرمان جدولک!" : "آفرین!";
@@ -759,9 +918,9 @@ function puzzleComplete(){
 }
 
 /* ================= confetti & toast ================= */
-function confetti(){
+function confetti(count){
   const colors = ["#fbbf24","#f472b6","#34d399","#60a5fa","#a78bfa","#f87171","#fde68a"];
-  for(let i=0;i<30;i++){
+  for(let i=0;i<count;i++){
     const el = document.createElement("div"); el.className = "confetti";
     el.style.left = (2+Math.random()*96)+"vw";
     el.style.setProperty("--dur", (1.7+Math.random()*1.7)+"s");
@@ -778,7 +937,7 @@ let toastTimer = null;
 function toast(msg){
   const t = $("toast"); t.textContent = msg; t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove("show"), 2000);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2200);
 }
 
 /* ================= sheet (⋮ menu / about / help) ================= */
@@ -805,25 +964,36 @@ async function boot(){
   }
   if(gs === "gate"){
     show("gate");
-    $("btn-join").addEventListener("click", ()=>tgOpen(CHANNEL));
-    $("btn-verify").addEventListener("click", ()=>tgOpen(BOT_LINK + "?start=gate"));
+    document.body.className = "theme-1";
+    $("btn-join").addEventListener("click", ()=>{ haptic("impact","medium"); tgOpen(CHANNEL); });
+    $("btn-verify").addEventListener("click", ()=>{
+      haptic("impact","medium");
+      const b = $("btn-verify");
+      b.classList.add("busy");
+      setTimeout(()=>b.classList.remove("busy"), 2500);
+      toast("در چت ربات، دکمهٔ «✅ عضو شدم» را بزن");
+      setTimeout(()=>tgOpen(BOT_LINK + "?start=check"), 400);
+    });
     return;
   }
   show("loading");
   $("btn-retry").addEventListener("click", ()=>location.reload());
   const date = tehranDate();
-  day = await fetchDay(date);
-  if(!day || !day.puzzles || !day.puzzles.length){ show("loaderr"); return; }
+  const fetched = await fetchDay(date);
+  if(!fetched || !fetched.data || !fetched.data.puzzles || !fetched.data.puzzles.length){ show("loaderr"); return; }
+  day = fetched.data;
+  if(fetched.fallback) setTimeout(()=>toast("📅 جدول امروز هنوز آماده نشده؛ فعلاً جدول دیروز نمایش داده می‌شود"), 1200);
   models = day.puzzles.map(p=>buildModel(p, day.date || date));
-  progress = loadProgress();
+  progress = await loadProgress();
   if(!progress || typeof progress !== "object" || progress.cur == null){ progress = {cur:0, typed:{}}; }
   progress.typed = progress.typed || {};
 
   renderKeyboard();
 
-  // menu buttons
-  $("btn-menu").addEventListener("click", ()=>showSheet("sheet-menu"));
+  /* menu buttons */
+  $("btn-menu").addEventListener("click", ()=>{ haptic("impact","light"); showSheet("sheet-menu"); });
   $("sheet-scrim").addEventListener("click", hideSheet);
+  $("m-share").addEventListener("click", ()=>{ hideSheet(); tgOpen(SHARE_URL); });
   $("m-about").addEventListener("click", ()=>showSheet("sheet-about"));
   $("m-help").addEventListener("click", ()=>showSheet("sheet-help"));
   $("about-back").addEventListener("click", ()=>showSheet("sheet-menu"));
@@ -831,12 +1001,14 @@ async function boot(){
   $("m-reset").addEventListener("click", ()=>{
     progress.typed[P.n] = {};
     typedCells = {};
+    completeCache = {};
     P.words.forEach(w=>{ w.solved=false; w.cells.forEach(c=>c.locked=false); });
     hideSheet(); openPuzzle(pIdx);
     toast("🔄 جدول از نو شروع شد");
   });
   $("m-wipe").addEventListener("click", ()=>{
     progress = {cur:0, typed:{}};
+    completeCache = {};
     saveProgress(progress);
     hideSheet(); openPuzzle(0);
     toast("🧹 پیشرفت امروز پاک شد");
@@ -844,11 +1016,15 @@ async function boot(){
   $("factcaster-link").addEventListener("click", e=>{ e.preventDefault(); tgOpen(ABOUT_LINK); });
   $("btn-next").addEventListener("click", ()=>{
     $("win").hidden = true;
-    if(pIdx < day.puzzles.length-1) openPuzzle(pIdx+1);
+    if(pIdx < day.puzzles.length-1){
+      const dot = $("dots").children[pIdx+1];
+      if(dot) dot.classList.add("just-unlocked");
+      openPuzzle(pIdx+1);
+    }
   });
 
-  // choose the starting puzzle: saved position if still unlocked,
-  // otherwise the first incomplete unlocked one
+  /* choose the starting puzzle: saved position if still unlocked,
+     otherwise the first incomplete unlocked one */
   let start = 0;
   const saved = +progress.cur || 0;
   if(saved >= 1 && saved <= day.puzzles.length && isUnlocked(saved)) start = saved-1;
@@ -858,12 +1034,13 @@ async function boot(){
     }
   }
   show("app");
+  applyTheme(models[start].n, true);
   openPuzzle(start);
+  requestAnimationFrame(layout);
+  setTimeout(layout, 350);   /* after WebView settles */
 }
 
 document.addEventListener("DOMContentLoaded", boot);
-
-
 </script>
 </body>
 </html>
