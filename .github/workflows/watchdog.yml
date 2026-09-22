@@ -57,3 +57,4 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/dispatches" \
             -d '{"ref":"main","inputs":{"offset":"-1"}}'
+# registration nudge

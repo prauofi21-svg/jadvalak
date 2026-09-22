@@ -58,3 +58,4 @@ jobs:
             git commit -m "chore: daily crossword data [skip ci]"
             git push
           fi
+# registration nudge
