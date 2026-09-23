@@ -57,7 +57,11 @@ jobs:
         run: python jadvalak_bot.py
 
       - name: Chain the next run
-        if: ${{ always() }}
+        # Only chain on success/cancellation — NOT on failure. Chaining a
+        # failed run caused an infinite fail-loop cascade (each crash
+        # re-processed the same unconfirmed update and re-dispatched).
+        # Failures are left to the watchdog (every 30 min) to restart.
+        if: ${{ always() && steps.gw.outcome != 'failure' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
