@@ -146,6 +146,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 .dot.just-unlocked{animation:dotUnlock .7s cubic-bezier(.34,1.56,.64,1)}
 @keyframes dotUnlock{40%{transform:scale(2)}}
 
+/* ---- player count chip ---- */
+.pcount{flex:0 0 auto;font-size:.72rem;font-weight:800;color:var(--sub);white-space:nowrap;padding:3px 9px;background:var(--panel);border:1px solid var(--panel-bd);border-radius:999px;line-height:1.25;opacity:0;animation:appIn .5s ease .3s forwards}
+
 /* ---- grid ---- */
 .grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden}
 .grid-wrap{display:grid;grid-template-columns:repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px}
@@ -227,6 +230,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 #sheet .about-text a{color:var(--accent);text-decoration:none;direction:ltr;unicode-bidi:isolate;display:inline-block;font-weight:800}
 #sheet .about-text a:active{opacity:.7}
 #sheet .ver{font-size:.75rem;color:var(--sub);margin-top:10px;text-align:center}
+#sheet .stats-line{font-size:.82rem;font-weight:700;color:var(--sub);padding:0 4px 10px;text-align:center;line-height:1.9}
 #sheet .help-body{font-size:.92rem;line-height:2.1;font-weight:600;color:var(--ink);padding:4px 2px}
 
 /* ================= win overlay + confetti ================= */
@@ -307,6 +311,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
     <button class="menu-btn" id="btn-menu" aria-label="منو">⋮</button>
     <span class="lvl-label" id="lvl-label">جدول ۱ از ۱۰</span>
     <div class="dots" id="dots"></div>
+    <span class="pcount" id="pcount" hidden>👥</span>
   </div>
   <div class="grid-zone"><div class="grid-wrap" id="grid-wrap"></div></div>
   <div class="wprog" id="wprog">
@@ -323,6 +328,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
     <div class="grab"></div>
     <div id="sheet-menu">
       <h3>منوی جدولک</h3>
+      <div class="stats-line" id="stats-line" hidden></div>
       <button class="row" id="m-share"><span class="ic">📤</span> دعوت از دوستان</button>
       <button class="row" id="m-about"><span class="ic">ℹ️</span> درباره جدولک</button>
       <button class="row" id="m-help"><span class="ic">📖</span> راهنمای بازی</button>
@@ -974,6 +980,35 @@ function reconcileProgress(){
   return changed;
 }
 
+/* ================= player stats (fetch + display) ================= */
+async function loadStats(){
+  let s = null;
+  try{
+    const r = await fetchJson("data/stats.json");
+    if(r && r !== "404" && typeof r === "object" && +r.total > 0){
+      s = r;
+      try{ localStorage.setItem("jk:stats", JSON.stringify(s)); }catch(e){}
+    }
+  }catch(e){}
+  if(!s){ try{ s = JSON.parse(localStorage.getItem("jk:stats") || "null"); }catch(e){} }
+  if(s && typeof s === "object") renderStats(s);
+}
+function renderStats(s){
+  const total = +s.total || 0;
+  if(total <= 0) return;
+  const today = (s.day === tehranDate()) ? (+s.today || 0) : 0;
+  const pc = $("pcount");
+  pc.hidden = false;
+  pc.textContent = "👥 " + fa(total);
+  const line = $("stats-line");
+  if(line){
+    line.hidden = false;
+    line.textContent = today > 0
+      ? "👥 " + fa(total) + " بازیکن تا امروز — " + fa(today) + " بازیکن امروز"
+      : "👥 " + fa(total) + " بازیکن تا امروز";
+  }
+}
+
 /* ================= boot ================= */
 function show(id){
   ["gate","no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
@@ -1063,6 +1098,7 @@ async function boot(){
   show("app");
   applyTheme(models[start].n, true);
   openPuzzle(start);
+  loadStats();                    // non-blocking: 👥 players chip
   requestAnimationFrame(layout);
   setTimeout(layout, 350);   /* after WebView settles */
 }
