@@ -90,12 +90,27 @@ GATE_TEXT = (
     "۱) روی دکمهٔ «عضویت» بزن و عضو شو\n"
     "۲) بعد دکمهٔ «عضو شدم» را بزن تا عضویتت همین‌جا بررسی شود"
 )
-WELCOME_TEXT = (
-    "به جدولک خوش اومدی 🧩\n"
-    "هر روز ۱۰ جدول کلمات متقاطع فارسیِ تازه! ✨\n\n"
-    "جدول‌ها را به ترتیب حل کن تا قفل جدول بعدی باز شود. 🔓\n"
-    "برای دعوت دوستان، دکمهٔ «دعوت از دوستان» همین پایین هست. 📤"
-)
+
+FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def fa_num(n: int) -> str:
+    """1234 -> ۱۲۳۴ — same digit style as the mini app's fa()."""
+    return str(int(n)).translate(FA_DIGITS)
+
+
+def welcome_text() -> str:
+    """Welcome shown in the bot chat — includes the live player count
+    (mirrors the counter the mini app shows, from data/stats.json)."""
+    txt = (
+        "به جدولک خوش اومدی 🧩\n"
+        "هر روز ۱۰ جدول کلمات متقاطع فارسیِ تازه! ✨\n\n"
+        "جدول‌ها را به ترتیب حل کن تا قفل جدول بعدی باز شود. 🔓"
+    )
+    if _total_players >= 1:
+        txt += f"\n👥 بازیکن‌های جدولک تا امروز: {fa_num(_total_players)}"
+    txt += "\n\nبرای دعوت دوستان، دکمهٔ «دعوت از دوستان» همین پایین هست. 📤"
+    return txt
 
 _member_cache: dict = {}          # user_id -> (allowed, ts)
 _checker_idx: int = 0             # which checker token works
@@ -356,7 +371,7 @@ def handle_start(chat_id: int, user_id: int, first: bool):
         ))
         return
     if member:
-        send(chat_id, WELCOME_TEXT if first else "بیا داخل! 🎮", kb_app(user_id))
+        send(chat_id, welcome_text() if first else "بیا داخل! 🎮", kb_app(user_id))
     else:
         send(chat_id, GATE_TEXT, kb_join())
 
@@ -372,7 +387,7 @@ def handle_joined(cb) -> None:
         return
     if member:
         answer_cb(cb["id"], "✅ خوش اومدی! دکمهٔ «ورود به جدولک» تازه شد.")
-        edit_message(chat_id, message_id, WELCOME_TEXT, kb_app(user_id))
+        edit_message(chat_id, message_id, welcome_text(), kb_app(user_id))
     else:
         answer_cb(cb["id"], "هنوز عضویتت تایید نشد! اول عضو @daily_sciences شو.")
         # edit the same message (no spam) with a fresh nudge + join keyboard
