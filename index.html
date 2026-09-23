@@ -28,7 +28,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
   --csz:40px;          /* cell size — set dynamically */
   --kh:40px;           /* key height — set dynamically */
   --kw:39px;           /* key width — set dynamically */
-  --axis:36px;         /* numbers gutter width */
   --gap:3px;
   --radius:14px;
 }
@@ -149,16 +148,17 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 
 /* ---- grid ---- */
 .grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden}
-.grid-wrap{display:grid;grid-template-columns:var(--axis) repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px}
-.axn{display:flex;align-items:center;justify-content:flex-start;gap:2px;padding:0 1px;min-width:0}
-.num{min-width:16px;height:16px;padding:0 2px;border-radius:5px;background:var(--panel);border:1px solid var(--panel-bd);font-size:9.5px;font-weight:800;color:var(--sub);display:grid;place-items:center;transition:transform .25s cubic-bezier(.34,1.56,.64,1),background-color .25s,border-color .25s;line-height:1}
-.num.on{background:var(--accent);color:var(--accent-ink);border-color:transparent;transform:scale(1.3)}
+.grid-wrap{display:grid;grid-template-columns:repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px}
+/* classic crossword corner number — small chip at the top-right of each word's START cell */
+.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:var(--cell);font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:var(--sub);pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2}
+.num.on{color:var(--accent);font-weight:900;transform:scale(1.18);box-shadow:0 0 0 1.5px var(--accent)}
 .cell{width:var(--csz);height:var(--csz);background:var(--cell);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
 .cell.void{background:var(--void);border-color:transparent;cursor:default}
 .cell.hl{background:var(--hl)}
 .cell.cur{border-color:var(--hl-cur);box-shadow:0 0 0 2px var(--hl-cur) inset;background:var(--hl)}
 .cell.origin::before{content:"";position:absolute;top:2px;right:2px;width:0;height:0;border-top:7px solid var(--hl-cur);border-left:7px solid transparent;opacity:.9;pointer-events:none}
 .cell.locked{background:var(--ok);border-color:var(--ok-bd);color:var(--cell-ink)}
+.cell .lt{pointer-events:none}
 .cell span{pointer-events:none;animation:letterIn .16s cubic-bezier(.2,.8,.3,1.4)}
 @keyframes letterIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
 .cell.pop{animation:cellPop .3s cubic-bezier(.34,1.56,.64,1)}
@@ -258,7 +258,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @media (max-height:640px){
   .clue-banner{height:62px}
   .clue-text{font-size:16px;max-height:48px}
-  :root{--axis:32px}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
@@ -545,7 +544,7 @@ function buildModel(puzzle, date){
     return w;
   });
   /* standard crossword numbering: scan reading order (RTL rows), a shared
-     number per start cell; numbers live OUTSIDE the grid in the gutter */
+     number per start cell; the number sits in the corner of the START cell */
   const startMap = new Map();  // "r,c" -> {r,c,h,v}
   for(const w of words){
     const k = w.r+","+w.c;
@@ -554,16 +553,14 @@ function buildModel(puzzle, date){
     if(w.d==="h") s.h = w; else s.v = w;
   }
   const starts = [...startMap.values()].sort((a,b)=> a.r-b.r || a.c-b.c);
-  const rowBadges = new Map();  // row -> [{n, c}]  (badge per grid row)
+  const startNums = {};   // "r,c" -> shared number
   starts.forEach((s, i)=>{
     const n = i+1;
+    startNums[s.r+","+s.c] = n;
     if(s.h) s.h.num = n;
     if(s.v) s.v.num = n;
-    if(!rowBadges.has(s.r)) rowBadges.set(s.r, []);
-    rowBadges.get(s.r).push({n, c: s.c});
   });
-  for(const [r, list] of rowBadges) rowBadges.set(r, list.sort((a,b)=>a.c-b.c));
-  return { n: puzzle.n, words, cells, rowBadges };
+  return { n: puzzle.n, words, cells, startNums };
 }
 
 /* ================= global state ================= */
@@ -591,7 +588,7 @@ function layout(){
   const avail = vh - banner - status - wprog - padV - gapV;
   let kh = Math.floor((avail * 0.40 - kbdChrome) / 5);
   let csz = Math.floor(Math.min((avail * 0.60 - gridGaps) / 8,
-                                (vw - 12 - 36 - 7*3) / 8));
+                                (vw - 12 - 7*3) / 8));
   kh = Math.max(28, Math.min(48, kh));
   csz = Math.max(26, Math.min(47, csz));
   /* give leftovers to whichever is starving */
@@ -621,15 +618,6 @@ function renderGrid(){
   wrap.innerHTML = "";
   P.badgeEls = {};
   for(let r=0;r<SIZE;r++){
-    /* numbers gutter (outside the grid, right side in RTL) */
-    const gut = document.createElement("div"); gut.className="axn";
-    (P.rowBadges.get(r) || []).forEach(b=>{
-      const el = document.createElement("span");
-      el.className = "num"; el.textContent = fa(b.n);
-      P.badgeEls[b.n] = el;
-      gut.appendChild(el);
-    });
-    wrap.appendChild(gut);
     for(let c=0;c<SIZE;c++){
       const cell = P.cells[r+","+c];
       const d = document.createElement("div");
@@ -640,7 +628,14 @@ function renderGrid(){
         d.addEventListener("pointerdown", ()=>tapCell(cell));
         if(cell.locked) d.classList.add("locked");
         const ch = typedCells[r+","+c] || (cell.locked ? cell.sol : "");
-        if(ch) d.textContent = ch;
+        if(ch){ const lt = document.createElement("span"); lt.className = "lt"; lt.textContent = ch; d.appendChild(lt); }
+        const sn = P.startNums[r+","+c];
+        if(sn){
+          const b = document.createElement("span");
+          b.className = "num"; b.textContent = fa(sn);
+          P.badgeEls[sn] = b;
+          d.appendChild(b);
+        }
       }
       wrap.appendChild(d);
     }
@@ -677,7 +672,9 @@ function pressFx(el){
 
 function renderCellLetter(cell, ch){
   if(!cell.el) return;
-  cell.el.textContent = ch || "";
+  let lt = cell.el.querySelector(":scope > .lt");
+  if(!lt){ lt = document.createElement("span"); lt.className = "lt"; cell.el.appendChild(lt); }
+  lt.textContent = ch || "";
   if(ch){ cell.el.classList.remove("pop"); void cell.el.offsetWidth; cell.el.classList.add("pop"); }
 }
 
@@ -708,12 +705,10 @@ function updateBanner(){
 }
 
 function updateHighlights(){
-  document.querySelectorAll(".cell.hl,.cell.cur,.cell.origin").forEach(el=>el.classList.remove("hl","cur","origin"));
+  document.querySelectorAll(".cell.hl,.cell.cur").forEach(el=>el.classList.remove("hl","cur"));
   document.querySelectorAll(".num.on").forEach(el=>el.classList.remove("on"));
   if(!cur) return;
   cur.word.cells.forEach(c=>{ if(c.el) c.el.classList.add("hl"); });
-  const start = cur.word.cells[0];
-  if(start && start.el) start.el.classList.add("origin");
   if(cur.cell.el) cur.cell.el.classList.add("cur");
   const badge = P.badgeEls[cur.word.num];
   if(badge) badge.classList.add("on");
@@ -841,7 +836,7 @@ function lockWord(word){
     typedCells[c.r+","+c.c] = c.sol;
     if(c.el){
       c.el.classList.add("locked");
-      c.el.textContent = c.sol;
+      renderCellLetter(c, c.sol);
       /* cascade flip celebration, staggered per cell */
       c.el.classList.remove("flip"); void c.el.offsetWidth;
       setTimeout(()=>{ c.el.classList.add("flip"); }, i*70);
@@ -948,6 +943,33 @@ function showSheet(section){
 }
 function hideSheet(){ $("sheet").hidden = true; }
 
+/* ================= per-puzzle content signature =================
+   If a puzzle's words/placements ever change server-side (content fix),
+   that puzzle's saved letters are cleared automatically — solved puzzles
+   with unchanged content keep their progress. Clue-only edits keep sig. */
+function hashStr(s){
+  let h = 5381;
+  for(let i=0;i<s.length;i++){ h = ((h<<5) + h + s.charCodeAt(i)) >>> 0; }
+  return h.toString(36);
+}
+function puzzleSig(p){
+  return hashStr(p.words.map(w => [w.e, w.r, w.c, w.d].join(",")).join(";"));
+}
+function reconcileProgress(){
+  progress.sig = progress.sig || {};
+  let changed = 0;
+  day.puzzles.forEach(p=>{
+    const sig = puzzleSig(p);
+    if(progress.sig[p.n] !== sig){
+      if(progress.typed[p.n] && Object.keys(progress.typed[p.n]).length) changed++;
+      progress.typed[p.n] = {};
+      progress.sig[p.n] = sig;
+    }
+  });
+  if(changed) saveProgress(progress);
+  return changed;
+}
+
 /* ================= boot ================= */
 function show(id){
   ["gate","no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
@@ -987,6 +1009,7 @@ async function boot(){
   progress = await loadProgress();
   if(!progress || typeof progress !== "object" || progress.cur == null){ progress = {cur:0, typed:{}}; }
   progress.typed = progress.typed || {};
+  reconcileProgress();
 
   renderKeyboard();
 
