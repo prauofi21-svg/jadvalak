@@ -50,9 +50,10 @@ log = logging.getLogger("jadvalak-gen")
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 PUZZLES_PER_DAY = 10
-RESERVE_TARGET = 10
-CANDIDATES_PER_PUZZLE = 26
+RESERVE_TARGET = 5
+CANDIDATES_PER_PUZZLE = 20
 USED_HISTORY = 1200
+VALIDATOR_MODEL = "openai/gpt-oss-120b"
 
 TOPICS = [
     "آسمان شب، ستارگان و صورت‌های فلکی",
@@ -161,9 +162,10 @@ def detect_model() -> str | None:
     return _MODEL
 
 
-def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float = 0.7):
+def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float = 0.7,
+             model: str | None = None):
     """One chat completion with long 429 backoff (qwen: ~1000 tok/min)."""
-    model = detect_model()
+    model = model or detect_model()
     if not model:
         return None
     payload = {
@@ -174,7 +176,7 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
         "temperature": temperature,
     }
     last_err = None
-    for attempt in range(1, 5):
+    for attempt in range(1, 8):
         try:
             r = requests.post(f"{BASE}/chat/completions", headers=_headers(),
                               json=payload, timeout=(15, 180))
@@ -190,8 +192,8 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
                 except (TypeError, ValueError):
                     pass
                 last_err = "HTTP 429"
-                log.warning("rate-limited — sleeping %ds (attempt %d/4)", wait, attempt)
-                time.sleep(wait)
+                log.warning("rate-limited — sleeping %ds (attempt %d/7)", wait, attempt)
+                time.sleep(min(wait, 45))
                 continue
             else:
                 last_err = f"HTTP {r.status_code}: {r.text[:180]}"
@@ -199,7 +201,7 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
                     break
         except requests.RequestException as exc:
             last_err = str(exc)
-        if attempt < 4:
+        if attempt < 7:
             time.sleep(3 * attempt)
     log.warning("LLM call failed: %s", last_err)
     return None
@@ -343,7 +345,7 @@ BUILTIN[7] = [
 ]
 BUILTIN[8] = [
     ("فضانورد", "مسافر افلاک"), ("مدارگرد", "چرخنده به دور سیاره"),
-    ("پیشران", "موتور پرتاب فضاپیما"), ("ایستگاه", "مقر مداری宇航"),
+    ("پیشران", "موتور پرتاب فضاپیما"), ("ایستگاه", "مقر مداری فضانوردان"),
     ("فرود", "نشستن بر سطح"), ("سنجاقک", "هواپیمای کوچک طبیعت"),
     ("کهکشان", "شهر عظیم ستارگان"), ("سیاره", "گردشگر مدار"),
     ("شهاب", "راز آسمان شب"), ("تلسکوپ", "چشم بزرگ رصدگر"),
@@ -351,6 +353,49 @@ BUILTIN[8] = [
     ("مدار", "مسیر گردش"), ("خلبان", "رانندهٔ آسمان"),
     ("جاذبه", "چشمگیر به سمت جرم"), ("انفجار", "شکوفایی ناگهانی"),
 ]
+# extra common words per topic — keeps the fallback bank from running dry
+BUILTIN_EXTRA = {
+    0: [("ماهواره", "گوش دورافکن زمین"), ("افق", "مرز آسمان و زمین"),
+        ("رصد", "پایش آسمان شب"), ("پرتو", "خط نور"),
+        ("تابش", "گسترش نور و انرژی"), ("اختر", "هر جرم آسمانی"),
+        ("ذره", "ریزترین واحد ماده"), ("انفجار", "گسترش ناگهانی با صدا")],
+    1: [("برف", "باران منجمد آسمان"), ("باد", "نفس نامرئی"),
+        ("برگ", "ششی سبز روی شاخه"), ("دره", "گودی میان دو کوه"),
+        ("تپه", "برآمدگی کوچک زمین"), ("سرما", "دمای پایین هوا"),
+        ("گرما", "دمای بالا"), ("جنگل", "خانهٔ پر درخت"),
+        ("بهار", "فصل شکوفایی"), ("پاییز", "فصل ریختن برگ")],
+    2: [("کاغذ", "بستر نوشته"), ("شعر", "سخن آهنگین"),
+        ("سخن", "گفتار"), ("جمله", "سازهٔ کامل معنا"),
+        ("نامه", "پیام کتبی"), ("گزارش", "بازگوکردن رویداد"),
+        ("صفحه", "رویهٔ نوشته و نمایش"), ("قصه", "روایت سرگرم‌کننده")],
+    3: [("علف", "گیاه کوتاه عرصه"), ("ساقه", "تنهٔ سبز گیاه"),
+        ("باغ", "زمین پر گل و درخت"), ("شکوفه", "غنچهٔ باز گل"),
+        ("خاک", "بستر ریشه"), ("سبزی", "گیاه خوراکی تازه")],
+    4: [("اتاق", "فضای درون خانه"), ("سقف", "بام داخلی خانه"),
+        ("پله", "راه پله‌های ساختمان"), ("چوب", "مادهٔ تنه درخت"),
+        ("اره", "ابزار برنده چوب"), ("چکش", "ابزار کوبنده میخ"),
+        ("فرش", "پوشش زمین خانه"), ("خانه", "سرپناه روزمره")],
+    5: [("کشتی", "ناو بزرگ دریا"), ("بندر", "لنگرگاه کشتی‌ها"),
+        ("جزیره", "خشکی میان آب"), ("مرجان", "شاخهٔ رنگین دریا"),
+        ("کوسه", "ماهی درنده دریا"), ("نهنگ", "غول مهربان اقیانوس"),
+        ("صیاد", "شکارچی دریا"), ("دریاچه", "آبگیر بزرگ")],
+    6: [("سفر", "رفتن از خانه"), ("راه", "مسیر رفت‌وآمد"),
+        ("صحرا", "کویر پهناور"), ("بادیه", "سرزمین کویری"),
+        ("قدم", "گام انسان")],
+    7: [("کاربر", "بهره‌بردار نرم‌افزار"), ("ربات", "ماشین کارگشای خودکار"),
+        ("فناوری", "دانش ساخت ابزار"), ("دیسک", "صفحهٔ گردان داده")],
+    8: [("موشک", "پرتاب‌کننده فضایی"), ("زمین", "سیارهٔ آبی خانه ما"),
+        ("صاروخ", "پرتابه آتشین آسمان")],
+    9: [("سیب", "میوهٔ سرخ باغ"), ("انار", "میوهٔ دانه‌یاقوتی"),
+        ("انگور", "میوهٔ خوشه‌ای"), ("هندوانه", "میوهٔ سرخ تابستان"),
+        ("پرتقال", "میوهٔ بهاری سرخ"), ("شیرینی", "خوراکی شکری"),
+        ("تولد", "سالگرد روز آمدن"), ("هدیه", "بخشیدنی محبت")],
+}
+for _k, _extra in BUILTIN_EXTRA.items():
+    _have = {w for w, _ in BUILTIN.get(_k, [])}
+    BUILTIN.setdefault(_k, []).extend(
+        (w, c) for w, c in _extra if w not in _have)
+
 # clean any non 32-letter words from the builtin bank
 for k in list(BUILTIN):
     BUILTIN[k] = [(normalize_word(w), c) for w, c in BUILTIN[k]]
@@ -445,12 +490,14 @@ def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
 def validate_pairs(cands: list) -> list:
     """LLM gate: drop pairs that are not real common standalone Persian words
     or whose clue does not describe the word. Catches things like «پرشین»
-    (transliteration), «مربوع» (garbage), «اسلام» with a ROM clue."""
+    (transliteration), «مربوع» (garbage), «اسلام» with a ROM clue.
+    Runs on a SEPARATE model so it does not compete with the generator for
+    the same rate-limit bucket."""
     if not cands:
         return cands
     items = "\n".join(f"- واژه: {w} — شرح: {clue}" for w, clue in cands)
     reply = ask_llm(VALIDATOR_SYSTEM, VALIDATOR_PROMPT.format(items=items),
-                    max_tokens=2200, temperature=0.1)
+                    max_tokens=2200, temperature=0.1, model=VALIDATOR_MODEL)
     data = parse_json_arr(reply or "")
     if not data:
         log.warning("  validator unavailable — keeping all candidates")
@@ -524,8 +571,9 @@ def build_one_puzzle(idx: int, topic: str, avoid: set, used_today: set,
     if not ok:
         log.warning("  puzzle %d invalid: %s", idx + 1, errs)
         return None
-    if use_llm:
-        words = editor_pass(words)
+    # NOTE: the editor pass is intentionally disabled — the validator on a
+    # separate model is the quality gate, and skipping the editor keeps the
+    # pipeline inside Groq's tight free-tier rate limits.
     for w in words:
         used_today.add(w["w"])
     log.info("  built: %d words (h=%d, v=%d)", len(words),
@@ -571,6 +619,8 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
         p = build_one_puzzle(i, topic, used_words, used_today, rng, use_llm)
         if p:
             puzzles.append(p)
+        if use_llm:
+            time.sleep(10)   # pace: stay under the per-minute token limits
 
     # top up from the reserve pool if the LLM under-delivered.
     # Reserve puzzles enter the same LLM validation as fresh candidates and
