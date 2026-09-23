@@ -957,12 +957,16 @@ function puzzleSig(p){
 }
 function reconcileProgress(){
   progress.sig = progress.sig || {};
+  /* first run after the content-signature update (old save, no sigs):
+     INITIALIZE sigs for the current data WITHOUT wiping saved letters —
+     real content changes are detected on every later load instead. */
+  const migrating = Object.keys(progress.sig).length === 0;
   let changed = 0;
   day.puzzles.forEach(p=>{
     const sig = puzzleSig(p);
     if(progress.sig[p.n] !== sig){
-      if(progress.typed[p.n] && Object.keys(progress.typed[p.n]).length) changed++;
-      progress.typed[p.n] = {};
+      if(!migrating && progress.typed[p.n] && Object.keys(progress.typed[p.n]).length) changed++;
+      if(!migrating) progress.typed[p.n] = {};
       progress.sig[p.n] = sig;
     }
   });
