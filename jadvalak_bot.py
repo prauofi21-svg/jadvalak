@@ -192,27 +192,34 @@ def _gh_put(path: str, obj, msg: str) -> bool:
 
 def maybe_commit_stats(force: bool = False) -> None:
     """Throttled commit of the counters (every 5 min when dirty, or forced
-    at run end). Failures retry on the next throttle window."""
-    global _stats_dirty, _stats_last_commit
-    if not _stats_dirty or not GH_TOKEN:
-        return
-    now = time.time()
-    if not force and now - _stats_last_commit < 300:
-        return
-    day = tehran_day()
-    if day != _stats_day:            # midnight rollover
-        _stats_day = day
-    payload = {"total": _total_players, "today": _today_players, "day": _stats_day,
-               "updated": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
-    ok1 = _gh_put("data/users.json", {"users": sorted(_seen_users), "updated": _stats_day},
-                  "chore(stats): unique players [skip ci]")
-    ok2 = _gh_put("data/stats.json", payload, "chore(stats): counters [skip ci]")
-    _stats_last_commit = now
-    if ok1 and ok2:
-        _stats_dirty = False
-        log.info("stats committed: total=%d today=%d", _total_players, _today_players)
-    else:
-        log.warning("stats commit failed — retrying later")
+    at run end). NEVER raises: a stats problem must not kill the poller.
+    Failures retry on the next throttle window."""
+    global _stats_dirty, _stats_last_commit, _stats_day, _today_players
+    try:
+        if not _stats_dirty or not GH_TOKEN:
+            return
+        now = time.time()
+        if not force and now - _stats_last_commit < 300:
+            return
+        day = tehran_day()
+        if day != _stats_day:            # midnight rollover: reset today's count
+            _stats_day = day
+            _today_players = 0
+        payload = {"total": _total_players, "today": _today_players, "day": _stats_day,
+                   "updated": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
+        ok1 = _gh_put("data/users.json", {"users": sorted(_seen_users), "updated": _stats_day},
+                      "chore(stats): unique players [skip ci]")
+        ok2 = _gh_put("data/stats.json", payload, "chore(stats): counters [skip ci]")
+        _stats_last_commit = now
+        if ok1 and ok2:
+            _stats_dirty = False
+            log.info("stats committed: total=%d today=%d", _total_players, _today_players)
+        else:
+            log.warning("stats commit failed — retrying later")
+    except Exception as exc:
+        # belt & braces: keep the poller alive no matter what stats does
+        log.error("stats commit crashed (ignored): %s", exc)
+        _stats_last_commit = time.time()   # back off before retrying
 
 
 # --------------------------------------------------------------------------- #
@@ -223,8 +230,12 @@ def tg(method: str, token: str, payload: dict, timeout=(15, 60)) -> dict | None:
     try:
         r = requests.post(f"{TG_API}/bot{token}/{method}", json=payload,
                           headers=UA, timeout=timeout)
-        if r.status_code == 200 and r.json().get("ok"):
-            return r.json().get("result") or {}
+        if r.status_code == 200:
+            try:
+                if r.json().get("ok"):
+                    return r.json().get("result") or {}
+            except ValueError:
+                pass
         log.warning("tg %s -> %s %s", method, r.status_code, r.text[:180])
     except requests.RequestException as exc:
         log.warning("tg %s failed: %s", method, exc)
@@ -277,12 +288,17 @@ def is_member(user_id: int) -> bool | None:
                 params={"chat_id": GATE_CHAT_ID, "user_id": user_id},
                 headers=UA, timeout=(15, 30),
             )
-            if r.status_code == 200 and r.json().get("ok"):
-                status = (r.json().get("result") or {}).get("status", "")
-                _checker_idx = idx
-                result = status in ("creator", "administrator", "member", "restricted")
-                _member_cache[user_id] = (result, now)
-                return result
+            if r.status_code == 200:
+                try:
+                    ok = r.json().get("ok")
+                except ValueError:
+                    ok = False
+                if ok:
+                    status = (r.json().get("result") or {}).get("status", "")
+                    _checker_idx = idx
+                    result = status in ("creator", "administrator", "member", "restricted")
+                    _member_cache[user_id] = (result, now)
+                    return result
             # this token cannot see the channel — try the next one
             log.warning("checker token #%d cannot check membership: %s %s",
                         idx, r.status_code, r.text[:120])
@@ -456,12 +472,18 @@ def get_updates(offset: int, timeout: int) -> tuple:
         )
         if r.status_code == 409:
             return "CONFLICT", offset
-        if r.status_code == 200 and r.json().get("ok"):
-            ups = r.json().get("result") or []
-            next_off = offset
-            for u in ups:
-                next_off = max(next_off, u["update_id"] + 1)
-            return ups, next_off
+        if r.status_code == 200:
+            try:
+                body = r.json()
+            except ValueError:
+                log.warning("getUpdates returned non-JSON body")
+                return [], offset
+            if body.get("ok"):
+                ups = body.get("result") or []
+                next_off = offset
+                for u in ups:
+                    next_off = max(next_off, u["update_id"] + 1)
+                return ups, next_off
         log.warning("getUpdates -> %s %s", r.status_code, r.text[:160])
     except requests.RequestException as exc:
         log.warning("getUpdates failed: %s", exc)
