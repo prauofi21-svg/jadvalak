@@ -78,10 +78,11 @@ GEN_PROMPT = """موضوع واژه‌ها: {topic}
 برای جدول کلمات متقاطع فارسی، {n} واژهٔ رایج و زیبای فارسی با شرح کوتاه پیشنهاد بده.
 
 قواعد مهم (اگر نقض شود واژه حذف می‌شود):
-- هر واژه یک «تک‌واژهٔ» فارسی رایج بین ۳ تا ۸ حرف باشد (ترکیب/دوواژه‌ای ممنوع).
+- هر واژه یک «اسم یا واژهٔ مستقلِ رایج» فارسی باشد که در فرهنگ لغت مدخل خودش را دارد.
+- ممنوع: واژهٔ خارجیِ حرف‌نویسی‌شده (مثل پرشین، فایروال، اسکنر، هاک، فلش، فرم، دلفین)، واژهٔ ساختگی یا غلط املایی (مثل مربوع)، شکل وابسته یا اضافه‌دار (مثل ستارهای، پهنای)، حرف اضافه و وابسته‌های نحوی (مثل بالای)، افعال صرف‌شده.
 - فقط از این ۳۲ حرف استفاده کن: ا ب پ ت ث ج چ ح خ د ذ ر ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن و ه ی
 - این حروف ممنوع‌اند: آ ء ئ ؤ — واژه‌هایی مثل «آسمان» یا «مسئله» را پیشنهاد نکن.
-- شرح باید کوتاه (۲ تا ۱۰ واژه)، شیرین و دقیق باشد و خود واژه یا بخش قابل تشخیص آن را لو ندهد.
+- شرح باید کوتاه (۲ تا ۱۰ واژه)، شیرین و دقیق باشد و «همان واژه» را توصیف کند؛ شرحِ واژهٔ دیگری ممنوع است.
 - شرح فارسی روان باشد، نه ترجمهٔ تحت‌اللفظی.
 - واژه‌های تکراری و نام‌های خاص (شخص/برند/شهر) پیشنهاد نکن.
 
@@ -90,6 +91,22 @@ GEN_PROMPT = """موضوع واژه‌ها: {topic}
 
 پاسخ فقط به شکل JSON:
 [{{"w":"واژه","clue":"شرح کوتاه"}} , ...]"""
+
+VALIDATOR_SYSTEM = (
+    "You are a strict Persian lexicographer and crossword editor. You answer "
+    "with valid JSON only — no commentary, no markdown fences."
+)
+
+VALIDATOR_PROMPT = """این جفت‌های «واژه + شرح» برای جدول کلمات متقاطع فارسی پیشنهاد شده‌اند:
+{items}
+
+هر جفت را جداگانه و سخت‌گیرانه قضاوت کن:
+۱) آیا واژه یک «واژهٔ واقعی، رایج و مستقل فارسی» است؟ نامعتبر: واژهٔ خارجیِ حرف‌نویسی‌شده (پرشین، فایروال، اسکنر، هاک، فلش، دلفین)، واژهٔ ساختگی/غلط املایی (مربوع، اخر)، شکل وابسته یا اضافه‌دار (ستارهای، پهنای)، حرف اضافه (بالای، زیرِ)، فعل صرف‌شده، واژهٔ کمیابِ منسوخ.
+۲) آیا شرح دقیقاً «همان واژه» را توصیف می‌کند؟ (مثلاً شرح «حافظهٔ اصلی رایانه» برای واژهٔ «اسلام» یعنی ok=false)
+
+هر جفت که در هر دو معیار واجد شرایط بود ok=true بگیرد وگرنه ok=false.
+پاسخ فقط JSON — برای «همهٔ» جفت‌ها و با همان واژه‌ها:
+[{{"w":"همان واژه","ok":true}} , ...]"""
 
 EDITOR_SYSTEM = (
     "You are a meticulous Persian crossword editor. You answer with valid "
@@ -351,12 +368,53 @@ def load_json(path: Path, default):
         return default
 
 
+def un_xor_b64(enc: str, key: str) -> str:
+    """Reverse of xor_b64 — recover a plain word from a day-file entry."""
+    s = enc.replace("-", "+").replace("_", "/")
+    while len(s) % 4:
+        s += "="
+    raw = base64.b64decode(s)
+    kb = key.encode("utf-8")
+    return bytes(b ^ kb[i % len(kb)] for i, b in enumerate(raw)).decode("utf-8")
+
+
+def load_kept_puzzles(date: str, keep_first: int) -> list:
+    """Decode the first N puzzles of an existing day file back into the
+    internal {n, words:[{w,r,c,d,clue}]} format so they can be re-emitted
+    byte-identically while the rest of the day is regenerated."""
+    if keep_first <= 0:
+        return []
+    day_file = DATA_DIR / f"{date}.json"
+    old = load_json(day_file, None)
+    if not old or not old.get("puzzles"):
+        return []
+    kept = []
+    for p in old["puzzles"][:keep_first]:
+        words = []
+        for w in p.get("words", []):
+            try:
+                word = un_xor_b64(w["e"], date)
+            except (KeyError, ValueError):
+                return []          # undecodable — do not keep anything
+            if not word or not word_ok(word):
+                return []
+            words.append({"w": word, "r": w["r"], "c": w["c"], "d": w["d"],
+                          "clue": w["clue"]})
+        ok, errs = validate_puzzle(words)
+        if not ok:
+            log.warning("kept puzzle %s failed validation — dropping keep", p.get("n"))
+            return []
+        kept.append({"n": p["n"], "words": words})
+    log.info("keeping first %d puzzles of %s unchanged", len(kept), date)
+    return kept
+
+
 def tehran_today() -> str:
     return datetime.now(TEHRAN_TZ).strftime("%Y-%m-%d")
 
 
 def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
-    """Ask Groq for candidate words+clues; fall back to the builtin bank."""
+    """Ask Groq for candidate words+clues; validate; fall back to the builtin bank."""
     avoid_str = "، ".join(avoid[:120]) if avoid else "(هیچ)"
     prompt = GEN_PROMPT.format(topic=topic, n=n, avoid=avoid_str)
     for attempt in range(2):
@@ -372,12 +430,41 @@ def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
             if word_ok(w) and clue_ok(clue, w):
                 cands.append((w, clue))
         if len(cands) >= 12:
-            log.info("  groq candidates: %d usable", len(cands))
-            return cands
-        log.warning("  groq gave %d usable candidates (attempt %d) — retrying",
-                    len(cands), attempt + 1)
+            cands = validate_pairs(cands)
+            log.info("  groq candidates: %d usable (after validation)", len(cands))
+            if len(cands) >= 10:
+                return cands
+            log.warning("  only %d survived validation — retrying", len(cands))
+        else:
+            log.warning("  groq gave %d usable candidates (attempt %d) — retrying",
+                        len(cands), attempt + 1)
     log.warning("  falling back to builtin bank for this topic")
     return []
+
+
+def validate_pairs(cands: list) -> list:
+    """LLM gate: drop pairs that are not real common standalone Persian words
+    or whose clue does not describe the word. Catches things like «پرشین»
+    (transliteration), «مربوع» (garbage), «اسلام» with a ROM clue."""
+    if not cands:
+        return cands
+    items = "\n".join(f"- واژه: {w} — شرح: {clue}" for w, clue in cands)
+    reply = ask_llm(VALIDATOR_SYSTEM, VALIDATOR_PROMPT.format(items=items),
+                    max_tokens=2200, temperature=0.1)
+    data = parse_json_arr(reply or "")
+    if not data:
+        log.warning("  validator unavailable — keeping all candidates")
+        return cands
+    bad = set()
+    for it in data:
+        if isinstance(it, dict):
+            w = normalize_word(str(it.get("w") or ""))
+            if w and it.get("ok") is False:
+                bad.add(w)
+    if bad:
+        log.info("  validator dropped %d bad pairs: %s", len(bad),
+                 "، ".join(sorted(bad))[:140])
+    return [wc for wc in cands if wc[0] not in bad]
 
 
 def editor_pass(puzzle_words: list) -> list:
@@ -463,16 +550,24 @@ def make_day_payload(date: str, puzzles: list) -> dict:
     return {"date": date, "v": 1, "puzzles": out}
 
 
-def generate_day(date: str, use_llm: bool = True) -> tuple:
-    """Returns (day_payload, all_words_used_today) or (None, [])."""
+def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
+    """Returns (day_payload, all_words_used_today) or (None, []).
+    keep_first: preserve the first N puzzles of an existing day file exactly
+    (their words count as used) and generate only the rest."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     used = load_json(DATA_DIR / "used_words.json", {"words": []})
     used_words = set(used.get("words", [])[-USED_HISTORY:])
     reserve = load_json(DATA_DIR / "reserve.json", {"puzzles": []})
 
+    kept = load_kept_puzzles(date, keep_first) if keep_first else []
+    keep_n = len(kept)
+
     rng = random.Random(date)
-    puzzles, used_today = [], set()
-    for i, topic in enumerate(TOPICS):
+    puzzles, used_today = list(kept), set()
+    for p in kept:
+        used_today.update(w["w"] for w in p["words"])
+
+    for i, topic in enumerate(TOPICS[keep_n:], start=keep_n):
         p = build_one_puzzle(i, topic, used_words, used_today, rng, use_llm)
         if p:
             puzzles.append(p)
@@ -522,10 +617,13 @@ def top_up_reserve(date: str, use_llm: bool = True) -> list:
     return have[:RESERVE_TARGET + 5]
 
 
-def generate_and_save(date: str, use_llm: bool, force: bool = False) -> bool:
+def generate_and_save(date: str, use_llm: bool, force: bool = False,
+                      keep_first: int = 0) -> bool:
     """Generate + persist one day file. Idempotent: an existing, sufficiently
     full day file is NEVER overwritten (keeps the day's puzzles stable),
-    unless force=True. Returns True on success/skip, False on failure."""
+    unless force=True. keep_first preserves the first N puzzles while
+    regenerating the rest (mid-day content fixes). Returns True on
+    success/skip, False on failure."""
     day_file = DATA_DIR / f"{date}.json"
     if day_file.exists() and not force:
         try:
@@ -539,8 +637,9 @@ def generate_and_save(date: str, use_llm: bool, force: bool = False) -> bool:
         except (OSError, ValueError):
             log.warning("existing %s unreadable — regenerating", day_file)
 
-    log.info("generating %d puzzles for %s (llm=%s)", PUZZLES_PER_DAY, date, use_llm)
-    payload, used_today = generate_day(date, use_llm)
+    log.info("generating %d puzzles for %s (llm=%s, keep_first=%d)",
+             PUZZLES_PER_DAY, date, use_llm, keep_first)
+    payload, used_today = generate_day(date, use_llm, keep_first=keep_first)
     if not payload:
         log.error("generation FAILED for %s", date)
         return False
@@ -573,6 +672,9 @@ def main() -> int:
                     help="offline run using the builtin word bank")
     ap.add_argument("--force", action="store_true",
                     help="regenerate even if the day file already exists")
+    ap.add_argument("--keep-first", type=int, default=0, metavar="N",
+                    help="keep the first N puzzles of the existing day file; "
+                         "regenerate the rest (requires --force)")
     ap.add_argument("--no-reserve", action="store_true",
                     help="skip the reserve top-up step")
     args = ap.parse_args()
@@ -599,7 +701,8 @@ def main() -> int:
 
     ok = True
     for d in dates:
-        if not generate_and_save(d, use_llm, force=args.force):
+        if not generate_and_save(d, use_llm, force=args.force,
+                                 keep_first=args.keep_first):
             ok = False
 
     if ok and not args.no_reserve:
