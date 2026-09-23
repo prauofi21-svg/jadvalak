@@ -35,13 +35,15 @@ Files written:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
 import logging
 import os
 import time
-import base64
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import quote
 
 import requests
@@ -56,6 +58,13 @@ APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "720"))
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
+
+# ---- player statistics (unique-player counter shown in the mini app) ----
+GH_TOKEN = os.environ.get("GH_TOKEN", "")           # GITHUB_TOKEN of the run
+STATS_REPO = os.environ.get("GITHUB_REPOSITORY", "prauofi21-svg/jadvalak")
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
+STATS_USERS_FILE = Path("data/users.json")
+STATS_STATS_FILE = Path("data/stats.json")
 CONTROL_URL = os.environ.get(
     "CONTROL_URL",
     "https://raw.githubusercontent.com/prauofi21-svg/jadvalak/main/control.json",
@@ -91,6 +100,104 @@ WELCOME_TEXT = (
 _member_cache: dict = {}          # user_id -> (allowed, ts)
 _checker_idx: int = 0             # which checker token works
 _gate_broken_notified: set = set()
+
+# ---- stats state ----
+_seen_users: set = set()          # salted hashes of counted player ids
+_total_players: int = 0
+_today_players: int = 0
+_stats_day: str = ""
+_stats_dirty: bool = False
+_stats_last_commit: float = 0.0
+
+
+def _stats_salt() -> str:
+    """Secret salt: without the bot token nobody can map hashes to ids."""
+    return hashlib.sha256(("jadvalak-stats:" + BOT_TOKEN).encode()).hexdigest()
+
+
+def _uhash(uid: int) -> str:
+    return hashlib.sha256((_stats_salt() + str(uid)).encode()).hexdigest()
+
+
+def tehran_day() -> str:
+    return datetime.now(TEHRAN_TZ).strftime("%Y-%m-%d")
+
+
+def stats_load() -> None:
+    """Load committed counters from the run's checkout of main."""
+    global _seen_users, _total_players, _today_players, _stats_day
+    _stats_day = tehran_day()
+    try:
+        users = json.loads(STATS_USERS_FILE.read_text(encoding="utf-8"))
+        _seen_users = set(users.get("users", []))
+        _total_players = len(_seen_users)
+    except (OSError, ValueError):
+        _seen_users, _total_players = set(), 0
+    try:
+        st = json.loads(STATS_STATS_FILE.read_text(encoding="utf-8"))
+        if st.get("day") == _stats_day:
+            _today_players = int(st.get("today", 0))
+    except (OSError, ValueError):
+        pass
+    log.info("stats: %d known players", _total_players)
+
+
+def count_user(uid: int) -> None:
+    """Count a unique player (no-op for already-known ids)."""
+    global _total_players, _today_players, _stats_dirty
+    h = _uhash(uid)
+    if h in _seen_users:
+        return
+    _seen_users.add(h)
+    _total_players += 1
+    _today_players += 1
+    _stats_dirty = True
+
+
+def _gh_put(path: str, obj, msg: str) -> bool:
+    if not GH_TOKEN:
+        return False
+    headers = {"Authorization": f"token {GH_TOKEN}",
+               "Accept": "application/vnd.github+json",
+               "User-Agent": "jadvalak-stats"}
+    url = f"https://api.github.com/repos/{STATS_REPO}/contents/{path}"
+    try:
+        get = requests.get(f"{url}?ref=main", headers=headers, timeout=30)
+        body = {"message": msg, "branch": "main",
+                "content": base64.b64encode(
+                    json.dumps(obj, ensure_ascii=False).encode()).decode()}
+        if get.status_code == 200:
+            body["sha"] = get.json()["sha"]
+        put = requests.put(url, headers=headers, json=body, timeout=30)
+        return put.status_code in (200, 201)
+    except requests.RequestException as exc:
+        log.warning("stats put %s failed: %s", path, exc)
+        return False
+
+
+def maybe_commit_stats(force: bool = False) -> None:
+    """Throttled commit of the counters (every 5 min when dirty, or forced
+    at run end). Failures retry on the next throttle window."""
+    global _stats_dirty, _stats_last_commit
+    if not _stats_dirty or not GH_TOKEN:
+        return
+    now = time.time()
+    if not force and now - _stats_last_commit < 300:
+        return
+    day = tehran_day()
+    if day != _stats_day:            # midnight rollover
+        _stats_day = day
+    payload = {"total": _total_players, "today": _today_players, "day": _stats_day,
+               "updated": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
+    ok1 = _gh_put("data/users.json", {"users": sorted(_seen_users), "updated": _stats_day},
+                  "chore(stats): unique players [skip ci]")
+    ok2 = _gh_put("data/stats.json", payload, "chore(stats): counters [skip ci]")
+    _stats_last_commit = now
+    if ok1 and ok2:
+        _stats_dirty = False
+        log.info("stats committed: total=%d today=%d", _total_players, _today_players)
+    else:
+        log.warning("stats commit failed — retrying later")
 
 
 # --------------------------------------------------------------------------- #
@@ -238,6 +345,7 @@ def kb_app(user_id: int) -> dict:
 # --------------------------------------------------------------------------- #
 
 def handle_start(chat_id: int, user_id: int, first: bool):
+    count_user(user_id)
     member = is_member(user_id)
     if member is None:
         # no checker bot has channel access — fail CLOSED with an explanation
@@ -257,6 +365,7 @@ def handle_joined(cb) -> None:
     user_id = cb["from"]["id"]
     chat_id = cb["message"]["chat"]["id"]
     message_id = cb["message"]["message_id"]
+    count_user(user_id)
     member = is_member(user_id)
     if member is None:
         answer_cb(cb["id"], "بررسی عضویت موفق نبود؛ چند لحظه بعد دوباره بزن.")
@@ -362,13 +471,13 @@ def main() -> int:
     offset = START_OFFSET
     deadline = time.time() + RUNTIME_MINUTES * 60
     conflicts = 0
+    stats_load()
     log.info("polling for %.0f minutes (start offset=%d)", RUNTIME_MINUTES, offset)
 
     while time.time() < deadline:
-        if int(time.time()) % 60 == 0 or True:
-            pass
         if not gateway_enabled():
             log.info("control.json says OFF — stopping without chaining")
+            maybe_commit_stats(force=True)
             Path_flag = open("chain_flag.txt", "w")
             Path_flag.write("no-chain")
             Path_flag.close()
@@ -382,6 +491,7 @@ def main() -> int:
             log.warning("409 conflict (%d/12) — another poller is active", conflicts)
             if conflicts >= 12:
                 log.info("yielding to the other poller")
+                maybe_commit_stats(force=True)
                 with open("chain_flag.txt", "w") as fh:
                     fh.write("no-chain")
                 with open("chain_offset.txt", "w") as fh:
@@ -395,8 +505,10 @@ def main() -> int:
                 handle_update(u)
             except Exception as exc:
                 log.error("update handler crashed: %s", exc)
+        maybe_commit_stats()
 
-    # runtime exhausted — hand the offset to the next chained run
+    # runtime exhausted — flush stats, then hand the offset to the next chained run
+    maybe_commit_stats(force=True)
     with open("chain_flag.txt", "w") as fh:
         fh.write("chain")
     with open("chain_offset.txt", "w") as fh:
