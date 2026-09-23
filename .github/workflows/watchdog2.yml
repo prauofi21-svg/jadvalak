@@ -10,7 +10,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  # actions: write is REQUIRED to dispatch the gateway workflow.
+  # (with only "read" the dispatch POST got 403 silently and the bot
+  # stayed down for hours while the watchdog reported success.)
+  actions: write
   contents: read
 
 jobs:
@@ -52,9 +55,14 @@ jobs:
           fi
 
           echo "gateway is DOWN — restarting it"
-          curl -s -X POST \
+          HTTP=$(curl -s -o /tmp/dispatch_resp.json -w "%{http_code}" -X POST \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/dispatches" \
-            -d '{"ref":"main","inputs":{"offset":"-1"}}'
-# registration nudge
+            -d '{"ref":"main","inputs":{"offset":"-1"}}')
+          echo "dispatch HTTP $HTTP"
+          cat /tmp/dispatch_resp.json 2>/dev/null || true
+          if [ "$HTTP" != "204" ]; then
+            echo "::warning::gateway restart dispatch failed (HTTP $HTTP)"
+            exit 1
+          fi
