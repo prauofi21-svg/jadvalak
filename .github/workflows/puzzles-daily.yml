@@ -23,6 +23,10 @@ on:
         type: boolean
         required: false
         default: false
+      keep_first:
+        description: "keep the first N puzzles of the existing day (content fix); 0 = full regen"
+        required: false
+        default: "0"
 
 permissions:
   contents: write
@@ -50,11 +54,12 @@ jobs:
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
           DATE_ARG: ${{ inputs.date }}
           FORCE_ARG: ${{ inputs.force && '--force' || '' }}
+          KEEP_ARG: ${{ inputs.keep_first || '0' }}
         run: |
           if [ -n "$DATE_ARG" ]; then
-            python generate_puzzles.py --date "$DATE_ARG" $FORCE_ARG
+            python generate_puzzles.py --date "$DATE_ARG" $FORCE_ARG --keep-first "$KEEP_ARG"
           else
-            python generate_puzzles.py --date auto $FORCE_ARG
+            python generate_puzzles.py --date auto $FORCE_ARG --keep-first "$KEEP_ARG"
           fi
 
       - name: Commit puzzle data
