@@ -572,7 +572,9 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
         if p:
             puzzles.append(p)
 
-    # top up from the reserve pool if the LLM under-delivered
+    # top up from the reserve pool if the LLM under-delivered.
+    # Reserve puzzles enter the same LLM validation as fresh candidates and
+    # are skipped if any of their words was already used on a previous day.
     if len(puzzles) < PUZZLES_PER_DAY and reserve.get("puzzles"):
         for p in reserve["puzzles"]:
             if len(puzzles) >= PUZZLES_PER_DAY:
@@ -580,11 +582,19 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
             if p.get("date") == date:
                 continue
             words = p.get("words") or []
-            if words and all(w.get("clue") for w in words) and \
-                    not (used_today & {w["w"] for w in words}):
-                puzzles.append({"n": len(puzzles) + 1, "words": words})
-                used_today.update(w["w"] for w in words)
-                log.info("topped up from reserve")
+            if not words or not all(w.get("clue") for w in words):
+                continue
+            wset = {w["w"] for w in words}
+            if (used_today & wset) or (used_words & wset):
+                continue
+            if use_llm:
+                survivors = validate_pairs([(w["w"], w["clue"]) for w in words])
+                if len(survivors) != len(words):
+                    log.info("  reserve puzzle rejected by validator — skipping")
+                    continue
+            puzzles.append({"n": len(puzzles) + 1, "words": words})
+            used_today.update(wset)
+            log.info("topped up from reserve (validated)")
 
     if len(puzzles) < PUZZLES_PER_DAY:
         log.error("only %d/%d puzzles could be built", len(puzzles), PUZZLES_PER_DAY)
@@ -600,13 +610,26 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
 
 
 def top_up_reserve(date: str, use_llm: bool = True) -> list:
-    """Try to grow the emergency reserve pool to RESERVE_TARGET puzzles."""
+    """Rebuild the emergency reserve pool to RESERVE_TARGET puzzles.
+    Existing entries are re-validated: any puzzle containing a word the LLM
+    gate rejects (or that was used on a past day) is dropped."""
     reserve = load_json(DATA_DIR / "reserve.json", {"puzzles": []})
-    have = [p for p in reserve.get("puzzles", []) if p.get("words")]
-    if len(have) >= RESERVE_TARGET:
-        return have[:RESERVE_TARGET]
     used = load_json(DATA_DIR / "used_words.json", {"words": []})
     avoid = set(used.get("words", [])[-USED_HISTORY:])
+    have = []
+    for p in reserve.get("puzzles", []):
+        words = p.get("words") or []
+        if not words or not all(w.get("clue") for w in words):
+            continue
+        wset = {w["w"] for w in words}
+        if wset & avoid:
+            continue
+        if use_llm and len(validate_pairs([(w["w"], w["clue"]) for w in words])) != len(words):
+            log.info("  dropping stale/invalid reserve puzzle")
+            continue
+        have.append(p)
+    if len(have) >= RESERVE_TARGET:
+        return have[:RESERVE_TARGET]
     rng = random.Random(f"reserve-{date}")
     for i in range(RESERVE_TARGET - len(have)):
         topic = TOPICS[(len(have) + i) % len(TOPICS)]
