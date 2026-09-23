@@ -19,6 +19,7 @@ on:
 
 permissions:
   actions: write
+  contents: write   # stats counters committed by the bot itself
 
 concurrency:
   group: gateway-poll
@@ -50,6 +51,9 @@ jobs:
           TOKEN_TTL_MIN: 720
           RUNTIME_MINUTES: ${{ inputs.runtime_minutes || '345' }}
           START_OFFSET: ${{ inputs.offset || '-1' }}
+          # for the in-app player counter (users.json / stats.json commits)
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: python jadvalak_bot.py
 
       - name: Chain the next run
