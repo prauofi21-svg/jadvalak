@@ -69,8 +69,22 @@ jobs:
           git add data/ || true
           if git diff --cached --quiet; then
             echo "data unchanged — nothing to commit"
-          else
-            git commit -m "chore: daily crossword data [skip ci]"
-            git pull --rebase --no-edit || true
-            git push
+            exit 0
           fi
+          git commit -m "chore: daily crossword data [skip ci]"
+          for i in 1 2 3; do
+            if git push origin main; then
+              echo "pushed on attempt $i"
+              exit 0
+            fi
+            echo "push rejected (attempt $i) — rebasing, keeping OUR data files"
+            git fetch origin main
+            if git rebase origin/main; then
+              continue
+            fi
+            # resolve any data/ conflict by keeping our freshly generated version
+            git checkout --theirs -- data/ 2>/dev/null || true
+            git add -A data/ 2>/dev/null || true
+            git rebase --continue || true
+          done
+          git push origin main
