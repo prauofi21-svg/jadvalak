@@ -462,12 +462,21 @@ def gateway_enabled() -> bool:
 # --------------------------------------------------------------------------- #
 
 def get_updates(offset: int, timeout: int) -> tuple:
-    """Returns (updates, next_offset) or raises/returns special codes."""
+    """Returns (updates, next_offset) or raises/returns special codes.
+
+    offset == -1 (bootstrap) OMITS the offset parameter entirely, so
+    Telegram returns ALL unconfirmed updates oldest-first — previously
+    passing offset=-1 returned only the LAST pending update and the
+    offset jump silently confirmed/dropped every older unanswered message.
+    """
     try:
+        params = {"timeout": timeout, "allowed_updates":
+                  json.dumps(["message", "callback_query"])}
+        if offset >= 0:
+            params["offset"] = offset
         r = requests.get(
             f"{TG_API}/bot{BOT_TOKEN}/getUpdates",
-            params={"timeout": timeout, "offset": offset, "allowed_updates":
-                    json.dumps(["message", "callback_query"])},
+            params=params,
             headers=UA, timeout=(timeout + 20, timeout + 20),
         )
         if r.status_code == 409:
