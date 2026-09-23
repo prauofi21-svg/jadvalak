@@ -58,7 +58,7 @@
 1. Secret ها را در ریپو تنظیم کنید:
    - `BOT_TOKEN` — توکن @jadvalak_bot
    - `CHECKER_TOKEN` — توکن یک ربات ادمینِ کانال (مثلاً ربات پست کانال)
-   - `GATE_CHAT_ID` — شناسهٔ کانال (مثل `-1004229980593`)
+   - `GATE_CHAT_ID` — شناسهٔ کانال (مثل `-100xxxxxxxxxx`)
    - `APP_URL` — آدرس Pages (مثل `https://prauofi21-svg.github.io/jadvalak`)
    - `GROK_API_KEY` — کلید Groq برای تولید جدول‌ها
 2. GitHub Pages را از شاخهٔ main فعال کنید
