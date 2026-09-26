@@ -52,7 +52,11 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 PUZZLES_PER_DAY = 10
 RESERVE_TARGET = 5
 CANDIDATES_PER_PUZZLE = 20
-USED_HISTORY = 1200
+# Words from this many most-recent days block reuse (prompt + filter).
+# ~5 days of freshness is plenty for a daily crossword; common words are
+# free to repeat after that — an ever-growing blocklist starves the builder
+# (obscure LLM words interlock badly) and killed generation on 09-24.
+USED_HISTORY = 400
 VALIDATOR_MODEL = "openai/gpt-oss-120b"
 
 TOPICS = [
@@ -627,6 +631,20 @@ def build_one_puzzle(idx: int, topic: str, avoid: set, used_today: set,
         if puzzle:
             break
     if not puzzle:
+        # rescue: LLM words are often obscure and refuse to interlock —
+        # merge common builtin-bank words into the pool and try again
+        bank_extra = [wc for k in BUILTIN for wc in BUILTIN[k]
+                      if wc[0] not in avoid and wc[0] not in used_today
+                      and not any(wc[0] == c[0] for c in cands)]
+        if bank_extra:
+            rng.shuffle(bank_extra)
+            merged = cands + bank_extra[:18]
+            for seed in range(14, 30):
+                puzzle = build_puzzle(merged, seed=idx * 100 + seed, target=11)
+                if puzzle:
+                    log.info("  rescued by merging builtin bank words")
+                    break
+    if not puzzle:
         log.warning("  could not build puzzle %d", idx + 1)
         return None
     words = puzzle["words"]
@@ -711,8 +729,9 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
 
     if len(puzzles) < PUZZLES_PER_DAY:
         log.error("only %d/%d puzzles could be built", len(puzzles), PUZZLES_PER_DAY)
-        if len(puzzles) < 6:
+        if len(puzzles) < 4:
             return None, []
+        log.warning("shipping a short day — better than an empty day")
 
     # renumber and build payload
     puzzles = sorted(puzzles, key=lambda p: p.get("n", 0))[:PUZZLES_PER_DAY]
@@ -795,7 +814,7 @@ def generate_and_save(date: str, use_llm: bool, force: bool = False,
 
     # final sanity: the day file must contain exactly the payload we validated
     check = json.loads(day_file.read_text(encoding="utf-8"))
-    assert len(check["puzzles"]) == len(payload["puzzles"]) >= 6
+    assert len(check["puzzles"]) == len(payload["puzzles"]) >= 4
     log.info("DONE: %s ready with %d puzzles", date, len(check["puzzles"]))
     return True
 
