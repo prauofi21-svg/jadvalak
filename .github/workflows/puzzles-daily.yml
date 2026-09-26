@@ -55,11 +55,19 @@ jobs:
           DATE_ARG: ${{ inputs.date }}
           FORCE_ARG: ${{ inputs.force && '--force' || '' }}
           KEEP_ARG: ${{ inputs.keep_first || '0' }}
+        # Layer 1: LLM pipeline (best clue quality).
+        # Layer 2: offline builtin-bank fallback — if the LLM pipeline fails
+        # (rate limits, quota, obscure words that refuse to interlock), the
+        # day files are still guaranteed from the 299-word offline bank, so
+        # the mini app NEVER opens to an empty day. Both layers are
+        # idempotent: an existing day file (>= 6 puzzles) is never touched.
         run: |
           if [ -n "$DATE_ARG" ]; then
-            python generate_puzzles.py --date "$DATE_ARG" $FORCE_ARG --keep-first "$KEEP_ARG"
+            python generate_puzzles.py --date "$DATE_ARG" $FORCE_ARG --keep-first "$KEEP_ARG" || \
+              python generate_puzzles.py --date "$DATE_ARG" --selftest
           else
-            python generate_puzzles.py --date auto $FORCE_ARG --keep-first "$KEEP_ARG"
+            python generate_puzzles.py --date auto $FORCE_ARG --keep-first "$KEEP_ARG" || \
+              python generate_puzzles.py --date auto --selftest
           fi
 
       - name: Commit puzzle data
