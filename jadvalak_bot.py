@@ -10,7 +10,9 @@ Responsibilities:
     so a user who leaves the channel must rejoin to get back in.
   - The mini-app button URL carries a signed, expiring access token
     (?st=uid.exp.sig) that the app validates (uid bound to initData,
-    expiry, format). TTL default: 60 minutes.
+    expiry, format). TTL default: 30 days — the app also keeps the token
+    in localStorage, so members enter the game directly on every open;
+    the gate page only appears for users who have not joined yet.
   - "I joined" inline button: re-checks membership instantly.
   - /about: "طراحی، ساخت و اجرا توسط @factcaster"
   - Membership checks use a list of bot tokens (any bot that is an admin of
@@ -22,7 +24,7 @@ Run modes (env):
     CHECKER_TOKENS     comma-separated admin-bot tokens (first = jadvalak itself)
     GATE_CHAT_ID       channel id, e.g. -1001234567890  (required)
     APP_URL            https URL of the mini app        (required)
-    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 60)
+    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 43200 = 30 days)
     RUNTIME_MINUTES    how long to poll this instance   (default 345)
     START_OFFSET       getUpdates offset to resume from (default -1)
     GH_TOKEN / GATEWAY_REPO / GATEWAY_WORKFLOW — used to write the chain
@@ -55,7 +57,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "720"))
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "43200"))   # 30 days: members re-enter the game directly, gate only on first visit
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 
@@ -330,6 +332,23 @@ def app_url_for(user_id: int) -> str:
     return f"{APP_URL}?st={make_access_token(user_id)}"
 
 
+def set_menu_button(chat_id: int, user_id: int) -> None:
+    """Refresh this chat's «جدولک» menu button with a fresh signed URL so
+    verified members open the game DIRECTLY (no gate) every time, even if
+    the mini app's localStorage was cleared. Best-effort: failures are
+    logged and ignored."""
+    if not APP_URL:
+        return
+    try:
+        tg("setChatMenuButton", BOT_TOKEN, {
+            "chat_id": chat_id,
+            "menu_button": {"type": "web_app", "text": "جدولک",
+                            "web_app": {"url": app_url_for(user_id)}},
+        })
+    except Exception as exc:
+        log.warning("setChatMenuButton failed: %s", exc)
+
+
 def verify_access_token(token: str, user_id: int | None) -> bool:
     """Server-side check (also mirrored client-side in the app)."""
     try:
@@ -387,6 +406,7 @@ def handle_start(chat_id: int, user_id: int, first: bool):
         ))
         return
     if member:
+        set_menu_button(chat_id, user_id)
         send(chat_id, welcome_text() if first else "بیا داخل! 🎮", kb_app(user_id))
     else:
         send(chat_id, GATE_TEXT, kb_join())
@@ -402,6 +422,7 @@ def handle_joined(cb) -> None:
         answer_cb(cb["id"], "بررسی عضویت موفق نبود؛ چند لحظه بعد دوباره بزن.")
         return
     if member:
+        set_menu_button(chat_id, user_id)
         answer_cb(cb["id"], "✅ خوش اومدی! دکمهٔ «ورود به جدولک» تازه شد.")
         edit_message(chat_id, message_id, welcome_text(), kb_app(user_id))
     else:
