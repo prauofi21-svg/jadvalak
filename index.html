@@ -274,15 +274,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 <div id="bg"></div>
 <div id="wipe"></div>
 
-<!-- ============ gate screen (join the channel first) ============ -->
-<div id="gate" class="screen" hidden>
-  <div class="logo">🧩</div>
-  <h2>جدولک</h2>
-  <p>برای بازی، اول عضو کانال <b>@daily_sciences</b> شو.</p>
-  <button class="btn" id="btn-join">📢 عضویت در @daily_sciences</button>
-  <button class="btn ghost" id="btn-verify">✅ عضو شدم، ادامه بده</button>
-</div>
-
 <!-- ============ not inside telegram ============ -->
 <div id="no-tg" class="screen" hidden>
   <div class="logo">🧩</div>
@@ -379,7 +370,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 "use strict";
 /* ================= Telegram ================= */
 const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-const CHANNEL = "https://t.me/daily_sciences";
 const BOT_LINK = "https://t.me/jadvalak_bot";
 const ABOUT_LINK = "https://t.me/factcaster";
 const SHARE_URL = "https://t.me/share/url?url=" + encodeURIComponent(BOT_LINK) +
@@ -444,33 +434,13 @@ function decodeWord(b64, key){
   }catch(e){ return ""; }
 }
 
-/* ================= gate (channel membership) =================
-   A signed token (?st=uid.exp.sig, HMAC'd by the bot) opens the game.
-   Once a valid token is seen it is kept in localStorage (30-day TTL), so
-   members enter the game DIRECTLY on every later open — the gate page
-   only ever appears for users who have not joined the channel yet. */
-function stValid(st, uid){
-  if(!st) return false;
-  const parts = st.split(".");
-  if(parts.length !== 3) return false;
-  const t = +parts[0], exp = +parts[1];
-  return t === uid && exp > Date.now()/1000 && parts[2].length > 20;
-}
-function stKey(){ return "jk:st:" + userId(); }
-function gateState(){
-  const user = TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
-  if(!user || !user.id) return "no-tg";
-  const qs = new URLSearchParams(location.search);
-  const st = qs.get("st");
-  if(stValid(st, user.id)){
-    try{ localStorage.setItem(stKey(), st); }catch(e){}
-    return "app";
-  }
-  try{
-    const saved = localStorage.getItem(stKey());
-    if(stValid(saved, user.id)) return "app";
-  }catch(e){}
-  return "gate";
+/* ================= entry =================
+   No gate page: the app opens straight into the game for every Telegram
+   user — single window, zero back-and-forth. Channel-membership guidance
+   lives in the bot chat (@jadvalak_bot → /start), which is the funnel. */
+function inTelegram(){
+  const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
+  return !!(u && u.id);
 }
 function userId(){ const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user; return u && u.id ? u.id : 0; }
 
@@ -1039,30 +1009,15 @@ function renderStats(s){
 
 /* ================= boot ================= */
 function show(id){
-  ["gate","no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
+  ["no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
 }
 
 async function boot(){
   tgReady();
   document.addEventListener("contextmenu", e=>e.preventDefault());
-  const gs = gateState();
-  if(gs === "no-tg"){
+  if(!inTelegram()){
     show("no-tg");
     $("btn-open-bot").addEventListener("click", ()=>{ location.href = BOT_LINK; });
-    return;
-  }
-  if(gs === "gate"){
-    show("gate");
-    document.body.className = "theme-1";
-    $("btn-join").addEventListener("click", ()=>{ haptic("impact","medium"); tgOpen(CHANNEL); });
-    $("btn-verify").addEventListener("click", ()=>{
-      haptic("impact","medium");
-      const b = $("btn-verify");
-      b.classList.add("busy");
-      setTimeout(()=>b.classList.remove("busy"), 2500);
-      toast("در چت ربات، دکمهٔ «✅ عضو شدم» را بزن");
-      setTimeout(()=>tgOpen(BOT_LINK + "?start=check"), 400);
-    });
     return;
   }
   show("loading");
