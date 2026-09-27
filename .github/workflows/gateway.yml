@@ -48,7 +48,7 @@ jobs:
           CHECKER_TOKENS: ${{ secrets.CHECKER_TOKEN }},${{ secrets.BOT_TOKEN }}
           GATE_CHAT_ID: ${{ secrets.GATE_CHAT_ID }}
           APP_URL: ${{ secrets.APP_URL }}
-          TOKEN_TTL_MIN: 720
+          TOKEN_TTL_MIN: 4320
           RUNTIME_MINUTES: ${{ inputs.runtime_minutes || '345' }}
           START_OFFSET: ${{ inputs.offset || '-1' }}
           # for the in-app player counter (users.json / stats.json commits)
