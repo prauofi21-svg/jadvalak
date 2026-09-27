@@ -274,6 +274,15 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 <div id="bg"></div>
 <div id="wipe"></div>
 
+<!-- ============ gate screen (channel members only) ============ -->
+<div id="gate" class="screen" hidden>
+  <div class="logo">🧩</div>
+  <h2>جدولک</h2>
+  <p>بازی جدولک برای اعضای کانال <b>@daily_sciences</b> است.</p>
+  <button class="btn" id="btn-join">📢 عضویت در @daily_sciences</button>
+  <button class="btn ghost" id="btn-verify">✅ عضو شدم — بازی کن</button>
+</div>
+
 <!-- ============ not inside telegram ============ -->
 <div id="no-tg" class="screen" hidden>
   <div class="logo">🧩</div>
@@ -370,6 +379,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 "use strict";
 /* ================= Telegram ================= */
 const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+const CHANNEL = "https://t.me/daily_sciences";
 const BOT_LINK = "https://t.me/jadvalak_bot";
 const ABOUT_LINK = "https://t.me/factcaster";
 const SHARE_URL = "https://t.me/share/url?url=" + encodeURIComponent(BOT_LINK) +
@@ -434,13 +444,39 @@ function decodeWord(b64, key){
   }catch(e){ return ""; }
 }
 
-/* ================= entry =================
-   No gate page: the app opens straight into the game for every Telegram
-   user — single window, zero back-and-forth. Channel-membership guidance
-   lives in the bot chat (@jadvalak_bot → /start), which is the funnel. */
-function inTelegram(){
-  const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
-  return !!(u && u.id);
+/* ================= access token (channel membership) =================
+   The bot verifies channel membership in chat (@jadvalak_bot) and issues a
+   signed token (?st=uid.exp.sig) — via the menu-button URL and the app
+   button. A VALID token (from the URL or localStorage) enters the game
+   DIRECTLY in this same window, every time. Only when it is missing or
+   expired does the short join screen appear (join + one tap to re-verify
+   in the bot chat, which auto-checks membership).
+   ST_MAX_WINDOW_SEC also rejects tokens whose exp is too far in the future,
+   so tightening the bot-side TTL cuts off already-issued tokens at once.
+   Keep it above the bot's TOKEN_TTL (currently 3 days). */
+const ST_MAX_WINDOW_SEC = 3.5 * 86400;
+function stValid(st, uid){
+  if(!st) return false;
+  const parts = st.split(".");
+  if(parts.length !== 3) return false;
+  const t = +parts[0], exp = +parts[1], now = Date.now()/1000;
+  return t === uid && exp > now && exp - now <= ST_MAX_WINDOW_SEC && parts[2].length > 20;
+}
+function stKey(){ return "jk:st:" + userId(); }
+function gateState(){
+  const user = TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
+  if(!user || !user.id) return "no-tg";
+  const qs = new URLSearchParams(location.search);
+  const st = qs.get("st");
+  if(stValid(st, user.id)){
+    try{ localStorage.setItem(stKey(), st); }catch(e){}
+    return "app";
+  }
+  try{
+    const saved = localStorage.getItem(stKey());
+    if(stValid(saved, user.id)) return "app";
+  }catch(e){}
+  return "gate";
 }
 function userId(){ const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user; return u && u.id ? u.id : 0; }
 
@@ -1009,15 +1045,30 @@ function renderStats(s){
 
 /* ================= boot ================= */
 function show(id){
-  ["no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
+  ["gate","no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
 }
 
 async function boot(){
   tgReady();
   document.addEventListener("contextmenu", e=>e.preventDefault());
-  if(!inTelegram()){
+  const gs = gateState();
+  if(gs === "no-tg"){
     show("no-tg");
     $("btn-open-bot").addEventListener("click", ()=>{ location.href = BOT_LINK; });
+    return;
+  }
+  if(gs === "gate"){
+    show("gate");
+    document.body.className = "theme-1";
+    $("btn-join").addEventListener("click", ()=>{ haptic("impact","medium"); tgOpen(CHANNEL); });
+    $("btn-verify").addEventListener("click", ()=>{
+      haptic("impact","medium");
+      const b = $("btn-verify");
+      b.classList.add("busy");
+      setTimeout(()=>b.classList.remove("busy"), 2500);
+      toast("عضویت در چت ربات بررسی می‌شود…");
+      setTimeout(()=>tgOpen(BOT_LINK + "?start=check"), 400);
+    });
     return;
   }
   show("loading");
