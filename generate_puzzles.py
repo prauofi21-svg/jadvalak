@@ -52,11 +52,15 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 PUZZLES_PER_DAY = 10
 RESERVE_TARGET = 5
 CANDIDATES_PER_PUZZLE = 20
-# Words from this many most-recent days block reuse (prompt + filter).
-# ~5 days of freshness is plenty for a daily crossword; common words are
-# free to repeat after that — an ever-growing blocklist starves the builder
-# (obscure LLM words interlock badly) and killed generation on 09-24.
-USED_HISTORY = 400
+# Words from this many most-recent DAYS-OF-USE block reuse (prompt + filter).
+# 2026-10-08 audit: at 400 words (~4.7 days at ~85 words/day) a whopping 85%
+# of recent days' words were RECYCLED old words — the sliding window simply
+# forgot them. Raised to 3000 ≈ 35 days: a full month between repeats, while
+# the LLM + the enlarged offline bank still have plenty of fresh vocabulary.
+# (The avoid list sent to the LLM prompt is capped separately to keep the
+# prompt token count sane — see AVOID_PROMPT_CAP.)
+USED_HISTORY = 3000
+AVOID_PROMPT_CAP = 900   # newest N avoid words actually listed in the prompt
 VALIDATOR_MODEL = "openai/gpt-oss-120b"
 
 TOPICS = [
@@ -282,6 +286,62 @@ def clue_ok(clue: str, word: str) -> bool:
         if w[i:i + 4] in clue:
             return False
     return True
+
+
+# --------------------------------------------------------------------------- #
+#  Structural word quality (2026-10-08 "wrong word" fix)                        #
+# --------------------------------------------------------------------------- #
+# Pure grammatical function words make terrible crossword answers and smell
+# like generation mistakes; block them outright.
+FUNCTION_WORDS = {
+    "به", "در", "از", "که", "را", "و", "با", "بر", "تا", "ای", "هر", "هم",
+    "این", "آن", "چه", "نیز", "اما", "چون", "گر", "اگر", "چرا", "کی", "هل",
+}
+# Latin/digit contamination or ghost letters -> definitely wrong.
+FORBIDDEN_CHARS_RE = re.compile(r"[A-Za-z0-9\u06F0-\u06F9\u0654\u0655]")
+
+
+def word_structural_ok(w: str) -> bool:
+    """Structural sanity: a real standalone Persian crossword answer."""
+    w = normalize_word(w or "")
+    if not (3 <= len(w) <= 8):
+        return False
+    if FORBIDDEN_CHARS_RE.search(w):
+        return False
+    if w in FUNCTION_WORDS:
+        return False
+    return True
+
+
+def pair_plausible(w: str, clue: str) -> bool:
+    """Catch (word, clue) SWAPS: a clue that is the verbatim clue of a
+    DIFFERENT builtin word means the pair was mismatched upstream
+    (observed 2026-09-29: «هزارت» carrying the clue of «توشه»)."""
+    clue = (clue or "").strip()
+    if not word_structural_ok(w) or not clue_ok(clue, w):
+        return False
+    nw = normalize_word(w)
+    for bw in _builtin_index().get(clue, []):
+        if bw != nw:
+            return False
+    return True
+
+
+# exact-clue -> [builtin words] index (built lazily, after BUILTIN is defined)
+_BUILTIN_INDEX: dict = {}
+
+
+def _build_builtin_index():
+    _BUILTIN_INDEX.clear()
+    for key in BUILTIN:
+        for w, clue in BUILTIN[key]:
+            _BUILTIN_INDEX.setdefault(clue.strip(), []).append(normalize_word(w))
+
+
+def _builtin_index():
+    if not _BUILTIN_INDEX:
+        _build_builtin_index()
+    return _BUILTIN_INDEX
 
 
 # --------------------------------------------------------------------------- #
@@ -667,10 +727,122 @@ for _k, _extra in BUILTIN_EXTRA3.items():
     BUILTIN.setdefault(_k, []).extend(
         (w, c) for w, c in _extra if w not in _have)
 
-# clean any non 32-letter words from the builtin bank
+# v3 (2026-10-08) — fresh-vocabulary expansion (~230 more common words).
+# Why: USED_HISTORY rose 400 -> 3000 (a full month of no-repeat), so the
+# offline lane needs a much deeper pool to keep even all-offline weeks
+# rotating cleanly. Words deliberately avoid every entry above.
+BUILTIN_EXTRA4 = {
+    17: [("کیهان", "پهنهٔ بی‌کران ستارگان"), ("رصدخانه", "خانهٔ چشم‌های آسمان"),
+         ("اخترشناس", "دانشمند پایشگر آسمان"), ("شفق", "رنگ‌بازی آسمان قطبی"),
+         ("سپیده", "نور اولیهٔ بامداد"), ("سحر", "ساعت پیش از خورشید"),
+         ("پروین", "خوشهٔ ستارگان گوسفند"), ("ثریا", "خوشهٔ درخشان آسمان"),
+         ("قطب", "ستارهٔ راهنمای شمال"), ("شرق", "سوی برآمدن خورشید"),
+         ("غرب", "سوی فرونشستن خورشید"), ("شبگرد", "شکارچی فعال شب")],
+    18: [("بوران", "باد تند همراه برف"), ("صاعقه", "چراغ ناگهانی ابر"),
+         ("تگرگ", "باران یخ‌شده"), ("اقلیم", "خویِ هوای سرزمین"),
+         ("سیلاب", "خشم رودها"), ("چمنزار", "فرش سبز طبیعت"),
+         ("مرغزار", "چمن‌ستان خیس"), ("شالیزار", "کشتزار برنج"),
+         ("بیشه", "جنگل انبوه"), ("گلزار", "باغ پرگل"),
+         ("خزان", "زمان ریختن برگ"), ("زمهریر", "سرمای سخت زمستان"),
+         ("قطره", "ذرّهٔ آب")],
+    19: [("جلد", "پوشش بیرونی کتاب"), ("مقدمه", "آغازِ گفتار و کتاب"),
+         ("ماهنامه", "نشریهٔ سی‌روزه"), ("ناشر", "پخش‌کنندهٔ کتاب"),
+         ("تیراژ", "شمار نسخه‌های چاپ"), ("رمان", "داستان بلند"),
+         ("سرود", "ترانهٔ رسمی و باوقار"), ("مرکب", "جوهر سنتی نوشتار"),
+         ("نوشتار", "آنچه نوشته می‌شود"), ("پژوهش", "جست‌وجوی دانش"),
+         ("پژوهشگر", "جویندهٔ دانش"), ("نقد", "داوری اثر و کار"),
+         ("املا", "بازنویسی درست واژه‌ها")],
+    20: [("غنچه", "جوانهٔ گل ناگشوده"), ("درختچه", "درخت کوتاه باغ"),
+         ("پسته", "مغز سبز خوش‌طعم"), ("فندق", "مغز کلاه‌دار درخت"),
+         ("زیتون", "میوهٔ روغنی سبز"), ("نخل", "درخت خرما"),
+         ("سرو", "درخت همیشه‌سبز بلند"), ("چنار", "تنهٔ پهن و کهن"),
+         ("بلوط", "میوهٔ درخت جنگل"), ("سپیدار", "درخت سیم‌فام"),
+         ("هویج", "ریشهٔ نارنجی مزرعه"), ("کاهو", "برگ خوراکی باغچه"),
+         ("خیار", "سبزی خنک تابستان"), ("کدو", "سبزی گرد باغچه"),
+         ("بادمجان", "سبزی بنفش خورشت"), ("پیاز", "ریزهٔ گریه‌آور آشپزخانه"),
+         ("سیر", "ریزهٔ پر بو و درمان")],
+    21: [("فولاد", "فلز استوار بنا"), ("بتن", "مادهٔ خاکستری ساختمان"),
+         ("فلز", "جنس درخشان سنگ"), ("لوله", "مسیر روان آب"),
+         ("پنکه", "چرخندهٔ خنک‌کننده"), ("بخاری", "گرم‌کنندهٔ زمستانی"),
+         ("یخچال", "نگه‌دار خوراک سرد"), ("اجاق", "کانون آتش خانه"),
+         ("تنور", "پزگاه نان سنتی"), ("قابلمه", "دیگ جوشان خورشت"),
+         ("کفگیر", "ابزار کشیدن غذا"), ("جارو", "پاک‌کنندهٔ خانه"),
+         ("سطل", "ظرف دسته‌دار آب"), ("زباله", "پسماند خانه"),
+         ("جعبه", "ظرف چهارگوش نگهداری"), ("مبلمان", "تجهیزات نشیمن")],
+    22: [("میگو", "ساکن خزری و خلیج"), ("اسکله", "سکوی کنار آب"),
+         ("پلیکان", "پرندهٔ کیسه‌دار دهان"), ("اسفنج", "جانور آب‌نواز"),
+         ("جلبک", "گیاه رشته‌ای آب"), ("پارو", "ابزار راندن قایق"),
+         ("دکل", "میلهٔ بادبان"), ("شناور", "وسیلهٔ رونما بر آب"),
+         ("تور", "ابزار صید ماهی"), ("عمق", "دوردستِ زیرین آب")],
+    23: [("کوله", "بار پشتی مسافر"), ("الاغ", "دام بانگ‌دار بارکش"),
+         ("چوپان", "نگه‌بان گله"), ("دام", "زیور و تله شکار"),
+         ("عصا", "تکیه‌گاه دست پیر"), ("نقشه", "طرح راه و سرزمین"),
+         ("راهنما", "همراه رهنمای سفر"), ("تشنگی", "نیاز سوزان آب"),
+         ("صعود", "بالارفتن از بلندی"), ("هیزم", "سوخت اجاق")],
+    24: [("سامانه", "کلکسیون هماهنگ اجزا"), ("تراشه", "مغز ریز سیلیکونی"),
+         ("گذرواژه", "کلید رمزی ورود"), ("گوشی", "تلفن همراه دست"),
+         ("دوربین", "چشم ثبت لحظه‌ها"), ("تصویر", "نقش دیده‌شده"),
+         ("لمس", "حس نواخت دست"), ("هوشمند", "زیرک و پیوسته به دانش"),
+         ("پرتاب", "رهاسازی به آسمان"), ("اشاره", "نشانهٔ دست و چشم")],
+    25: [("سفینه", "ناو سفر افلاک"), ("قمر", "همراه شبانهٔ زمین"),
+         ("خسوف", "گرفتگی ماه"), ("دنباله", "یراق پشت شهاب"),
+         ("انجماد", "سخت‌شدن مایع"), ("نیرو", "پدیدار حرکت اجسام"),
+         ("فشار", "راندن همسو"), ("سرعت", "تندی جنبش")],
+    26: [("خمیر", "آرد ورآمده نان"),
+         ("حلقه", "دایرهٔ توخالی"), ("جشنواره", "محفل بزرگ شادی"),
+         ("سرود", "نوای همگانی"), ("ملس", "شیرین نرم"),
+         ("شام", "خوراک شب"), ("ناهار", "خوراک میانهٔ روز"),
+         ("صبحانه", "خوراک آغاز روز"), ("طعم", "مزهٔ زبان"),
+         ("گلاب", "عطر گل سرخ"), ("دسر", "پایان شیرین سفره")],
+}
+for _k, _extra in BUILTIN_EXTRA4.items():
+    _have = {w for w, _ in BUILTIN.get(_k, [])}
+    BUILTIN.setdefault(_k, []).extend(
+        (w, c) for w, c in _extra if w not in _have)
+
+# general pools — v3 deep expansion (family, life, body, feelings, shapes,
+# physics, city, virtues)
+BUILTIN_EXTRA5 = {
+    27: [("پدر", "سرپرست مهربان خانه"), ("مادر", "مهربان‌ترین خانه"),
+         ("برادر", "هم‌خون پسر"), ("خواهر", "هم‌خون دختر"),
+         ("فرزند", "زادهٔ خانواده"), ("خانواده", "کوچک‌ترین جامعه"),
+         ("نوه", "زادهٔ فرزند"), ("عمو", "برادر پدر"), ("دایی", "برادر مادر")],
+    28: [("پرنده", "بال‌دار خوش‌پیمایش آسمان"), ("حشره", "جانور شش‌پای ریز"),
+         ("جانور", "زیستندهٔ احساس‌دار"), ("حیوان", "زیستندهٔ متحرک"),
+         ("گیاه", "زیست سبز بی‌حرکت"), ("جاندار", "زیستندهٔ نفس‌کش")],
+    29: [("دهان", "دروازهٔ گفتار"), ("معده", "کیسهٔ هضم غذا"),
+         ("عضله", "ماهیچهٔ تن"), ("زخم", "شکستگی پوست"),
+         ("مژه", "چتر چشم"), ("ناخن", "سپر نوک انگشت"),
+         ("کمر", "میان‌تن انسان")],
+    30: [("خشم", "آتش درون"), ("گریه", "باران چشم"),
+         ("لبخند", "شکوفهٔ لب"), ("شادمانی", "حال خوب دل"),
+         ("دلتنگی", "کمرنگی یار"), ("غرور", "خودپسندی بلند"),
+         ("حسرت", "دل‌تنگیِ گذشته")],
+    31: [("شکل", "قیافهٔ جسم"), ("دایره", "خط بستهٔ گرد"),
+         ("مربع", "چهارگوش برابر"), ("مثلث", "سه‌گوش"),
+         ("نقطه", "کوچک‌ترین نشانهٔ قلم"), ("رنگ", "جلا و جلوهٔ اشیا")],
+    32: [("حرارت", "زیادِ گرمی"), ("انرژی", "توان کار کردن"),
+         ("ماده", "آنچه جسم می‌سازد"), ("جسم", "تودهٔ مادی"),
+         ("وزن", "سنگینی جسم")],
+    33: [("سلام", "آغاز گفتار ایرانی"), ("احترام", "بزرگ‌داشت دیگران"),
+         ("مهربانی", "نرمی دل با دیگران"), ("وفا", "پایبندی به عهد"),
+         ("راستی", "درست‌گویی همیشه")],
+    34: [("محله", "همسایگی یکجا"), ("بن‌بست", "راه بی‌خروجی"),
+         ("ایوان", "جلوخان تابستانی"), ("گنبد", "سقف گرد بنا"),
+         ("طاق", "سقف خمیده"), ("پایه", "زیربنای ستون")],
+}
+for _k, _extra in BUILTIN_EXTRA5.items():
+    _have = {w for w, _ in BUILTIN.get(_k, [])}
+    BUILTIN.setdefault(_k, []).extend(
+        (w, c) for w, c in _extra if w not in _have)
+
+# clean the merged bank: 32-letter alphabet + structural rules
+# (3-8 letters, no function words, no Latin/digits) + (word, clue) swaps
 for k in list(BUILTIN):
     BUILTIN[k] = [(normalize_word(w), c) for w, c in BUILTIN[k]]
-    BUILTIN[k] = [(w, c) for w, c in BUILTIN[k] if word_ok(w) and clue_ok(c, w)]
+    BUILTIN[k] = [(w, c) for w, c in BUILTIN[k]
+                  if word_ok(w) and word_structural_ok(w) and pair_plausible(w, c)]
+
 
 
 # --------------------------------------------------------------------------- #
@@ -782,7 +954,10 @@ def backfill_used_words() -> int:
 
 def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
     """Ask Groq for candidate words+clues; validate; fall back to the builtin bank."""
-    avoid_str = "، ".join(avoid[:120]) if avoid else "(هیچ)"
+    # newest-first for the prompt: the most recently used words are the ones
+    # the LLM is most likely to propose again — tell it about THOSE.
+    avoid_prompt = list(avoid)[-AVOID_PROMPT_CAP:] if avoid else []
+    avoid_str = "، ".join(reversed(avoid_prompt)) if avoid_prompt else "(هیچ)"
     prompt = GEN_PROMPT.format(topic=topic, n=n, avoid=avoid_str)
     for attempt in range(2):
         reply = ask_llm(GEN_SYSTEM, prompt,
@@ -794,7 +969,7 @@ def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
                 continue
             w = normalize_word(str(it.get("w") or it.get("word") or ""))
             clue = str(it.get("clue") or it.get("definition") or "").strip()
-            if word_ok(w) and clue_ok(clue, w):
+            if pair_plausible(w, clue):
                 cands.append((w, clue))
         if len(cands) >= 12:
             cands = validate_pairs(cands)
@@ -860,23 +1035,28 @@ def editor_pass(puzzle_words: list) -> list:
 
 
 def build_one_puzzle(idx: int, topic: str, avoid: set, used_today: set,
-                     rng, use_llm: bool) -> dict | None:
+                     rng, use_llm: bool, avoid_order: list = None) -> dict | None:
     log.info("پازل %d — موضوع: %s", idx + 1, topic)
     cands = []
     if use_llm:
-        cands = generate_candidates(topic, sorted(avoid), CANDIDATES_PER_PUZZLE, rng)
+        cands = generate_candidates(topic, avoid_order or sorted(avoid),
+                                    CANDIDATES_PER_PUZZLE, rng)
     if not cands:
         bank = list(BUILTIN.get(idx % len(BUILTIN), [])) + \
                [wc for k in BUILTIN for wc in BUILTIN[k]]
         rng.shuffle(bank)
         cands = [wc for wc in bank
-                 if wc[0] not in avoid and wc[0] not in used_today][:26]
-    # filter: not used before, not used today
-    cands = [wc for wc in cands if wc[0] not in avoid and wc[0] not in used_today]
+                 if wc[0] not in avoid and wc[0] not in used_today
+                 and pair_plausible(*wc)][:26]
+    # filter: not used before, not used today, structurally sound
+    cands = [wc for wc in cands
+             if wc[0] not in avoid and wc[0] not in used_today
+             and pair_plausible(*wc)]
     if len(cands) < 10:
         # second sweep over the whole builtin bank
         bank = [wc for k in BUILTIN for wc in BUILTIN[k]
-                if wc[0] not in avoid and wc[0] not in used_today]
+                if wc[0] not in avoid and wc[0] not in used_today
+                and pair_plausible(*wc)]
         rng.shuffle(bank)
         cands = list(dict.fromkeys(cands + bank))[:30]
 
@@ -890,6 +1070,7 @@ def build_one_puzzle(idx: int, topic: str, avoid: set, used_today: set,
         # merge common builtin-bank words into the pool and try again
         bank_extra = [wc for k in BUILTIN for wc in BUILTIN[k]
                       if wc[0] not in avoid and wc[0] not in used_today
+                      and pair_plausible(*wc)
                       and not any(wc[0] == c[0] for c in cands)]
         if bank_extra:
             rng.shuffle(bank_extra)
@@ -940,7 +1121,9 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
     (their words count as used) and generate only the rest."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     used = load_json(DATA_DIR / "used_words.json", {"words": []})
-    used_words = set(used.get("words", [])[-USED_HISTORY:])
+    used_list = [w for w in used.get("words", [])[-USED_HISTORY:]
+                 if isinstance(w, str)]
+    used_words = set(used_list)
     reserve = load_json(DATA_DIR / "reserve.json", {"puzzles": []})
 
     kept = load_kept_puzzles(date, keep_first) if keep_first else []
@@ -952,7 +1135,8 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
         used_today.update(w["w"] for w in p["words"])
 
     for i, topic in enumerate(TOPICS[keep_n:], start=keep_n):
-        p = build_one_puzzle(i, topic, used_words, used_today, rng, use_llm)
+        p = build_one_puzzle(i, topic, used_words, used_today, rng, use_llm,
+                             avoid_order=used_list)
         if p:
             puzzles.append(p)
         if use_llm:
@@ -988,6 +1172,38 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
             return None, []
         log.warning("shipping a short day — better than an empty day")
 
+    # ── FINAL anti-repeat audit (2026-10-08) ──────────────────────────────
+    # Belt and braces: whatever filtered path a word took, nothing that is
+    # already in the avoid-history may ship. Offending puzzles are rebuilt
+    # with the recycled words hard-blocked (2 passes max).
+    for audit_pass in range(2):
+        offenders = []
+        for p in puzzles:
+            bad = [w["w"] for w in p["words"] if w["w"] in used_words]
+            if bad:
+                offenders.append((p, bad))
+        if not offenders:
+            break
+        log.warning("audit pass %d: %d puzzles carry recycled words %s",
+                    audit_pass + 1, len(offenders),
+                    sorted({w for _, bad in offenders for w in bad})[:15])
+        blocked = {w for _, bad in offenders for w in bad}
+        for p, _bad in offenders:
+            puzzles.remove(p)
+            used_today.difference_update(w["w"] for w in p["words"])
+        hard_avoid = used_words | blocked
+        for p, _bad in offenders:
+            idx = p.get("n", 1) - 1
+            topic = TOPICS[idx % len(TOPICS)]
+            rebuilt = build_one_puzzle(idx, topic, hard_avoid, used_today, rng,
+                                       use_llm=False)   # offline: no extra LLM cost
+            if rebuilt:
+                puzzles.append(rebuilt)
+                used_today.update(w["w"] for w in rebuilt["words"])
+        if len(puzzles) < 4:
+            log.error("anti-repeat rebuild left only %d puzzles", len(puzzles))
+            return None, []
+
     # renumber and build payload
     puzzles = sorted(puzzles, key=lambda p: p.get("n", 0))[:PUZZLES_PER_DAY]
     for i, p in enumerate(puzzles):
@@ -1002,7 +1218,9 @@ def top_up_reserve(date: str, use_llm: bool = True) -> list:
     gate rejects (or that was used on a past day) is dropped."""
     reserve = load_json(DATA_DIR / "reserve.json", {"puzzles": []})
     used = load_json(DATA_DIR / "used_words.json", {"words": []})
-    avoid = set(used.get("words", [])[-USED_HISTORY:])
+    avoid_list = [w for w in used.get("words", [])[-USED_HISTORY:]
+                  if isinstance(w, str)]
+    avoid = set(avoid_list)
     have = []
     for p in reserve.get("puzzles", []):
         words = p.get("words") or []
@@ -1020,10 +1238,12 @@ def top_up_reserve(date: str, use_llm: bool = True) -> list:
     rng = random.Random(f"reserve-{date}")
     for i in range(RESERVE_TARGET - len(have)):
         topic = TOPICS[(len(have) + i) % len(TOPICS)]
-        p = build_one_puzzle(i, topic, avoid, set(), rng, use_llm)
+        p = build_one_puzzle(i, topic, avoid, set(), rng, use_llm,
+                             avoid_order=avoid_list)
         if p:
             have.append({"words": p["words"], "date": date})
             avoid.update(w["w"] for w in p["words"])
+            avoid_list.extend(w["w"] for w in p["words"])
     return have[:RESERVE_TARGET + 5]
 
 
