@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0c1230">
+<meta name="theme-color" content="#0b1226">
 <title>جدولک 🧩</title>
 <!-- bundled locally: telegram.org is unreachable inside Iran without VPN -->
 <script src="telegram-web-app.js"></script>
@@ -32,76 +32,69 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
   --radius:14px;
 }
 
-/* ================= theme palette (10 levels) ================= */
-/* 1 — شب پرستاره */
-.theme-1{--bg1:#0c1230;--bg2:#1c2b5a;--panel:#0e1636ee;--panel-bd:#3b4f8f66;--ink:#eef2ff;--sub:#9fb0e8;
- --cell:#ffffffef;--cell-bd:#c7d2f2;--cell-ink:#141b38;--void:#101a3a;--kbd:#0f1a3eee;--kbd-bd:#3d52968c;--kbd-ink:#e8eeff;
- --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#1c2b5a;--tag-ink:#ffe9a0;
- --hl:#fde68ab8;--hl-cur:#fbbf24;--ok:#a7f3d0b8;--ok-bd:#34d399;--accent:#7aa2ff;--accent-ink:#0c1230}
-/* 2 — آسمان صبح */
-.theme-2{--bg1:#8ec9ff;--bg2:#dff1ff;--panel:#ffffffd9;--panel-bd:#7fb6e8;--ink:#17395c;--sub:#4a6d92;
- --cell:#ffffff;--cell-bd:#9cc4e8;--cell-ink:#17395c;--void:#6ea8d8;--kbd:#ffffffe6;--kbd-bd:#8fc0ea;--kbd-ink:#17395c;
- --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#1e7ce0;--tag-ink:#ffffff;
- --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#1e7ce0;--accent-ink:#fff}
-/* 3 — روزنامه */
-.theme-3{--bg1:#efe9dc;--bg2:#e4dcc9;--panel:#faf6ec;--panel-bd:#1a1a1a;--ink:#1a1a1a;--sub:#5a5a5a;
- --cell:#fdfbf5;--cell-bd:#1a1a1a;--cell-ink:#111;--void:#242424;--kbd:#f7f2e4;--kbd-bd:#1a1a1a;--kbd-ink:#1a1a1a;
- --banner:#ffffff;--banner-bd:#1a1a1a;--banner-ink:#111;--tag:#1a1a1a;--tag-ink:#f5f0e2;
- --hl:#f3e3a0cc;--hl-cur:#b8960f;--ok:#cfe6c9;--ok-bd:#4e7a43;--accent:#8b1a1a;--accent-ink:#fff}
-/* 4 — باغ سبز */
-.theme-4{--bg1:#e8f5e0;--bg2:#cdebc4;--panel:#ffffffd6;--panel-bd:#9cc79a;--ink:#1d3d1f;--sub:#4a6d4c;
- --cell:#ffffff;--cell-bd:#a5cfa0;--cell-ink:#1d3d1f;--void:#6d9a63;--kbd:#ffffffe6;--kbd-bd:#a5cfa0;--kbd-ink:#1d3d1f;
- --banner:#fff7d6;--banner-bd:#d9c768;--banner-ink:#33290a;--tag:#2f7a2a;--tag-ink:#fff;
- --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#2f7a2a;--accent-ink:#fff}
-/* 5 — چوب گرم */
-.theme-5{--bg1:#a9764f;--bg2:#7d5230;--panel:#f5e9d2e0;--panel-bd:#5c3d22;--ink:#3a2413;--sub:#6b4a2b;
- --cell:#f5e9d2;--cell-bd:#8a5a2b;--cell-ink:#3a2413;--void:#5c3d22;--kbd:#efe2c6e6;--kbd-bd:#8a5a2b;--kbd-ink:#3a2413;
- --banner:#fff3d0;--banner-bd:#8a5a2b;--banner-ink:#4a3407;--tag:#8a5a2b;--tag-ink:#ffefd0;
- --hl:#fde68ab8;--hl-cur:#d97706;--ok:#c8e6c9b8;--ok-bd:#5e8c3e;--accent:#8a5a2b;--accent-ink:#ffefd0}
-/* 6 — اقیانوس */
-.theme-6{--bg1:#0e5f6e;--bg2:#17a2b8;--panel:#eafcffdd;--panel-bd:#25d3f066;--ink:#06333c;--sub:#0d5560;
- --cell:#ffffff;--cell-bd:#7fc9d6;--cell-ink:#06333c;--void:#0a3f4a;--kbd:#d9f6fae6;--kbd-bd:#7fc9d6;--kbd-ink:#06333c;
- --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#0e5f6e;--tag-ink:#d5f7fb;
- --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#0e7a8c;--accent-ink:#fff}
-/* 7 — کویر */
-.theme-7{--bg1:#f2dcae;--bg2:#e0b980;--panel:#fff8e8d9;--panel-bd:#c05621;--ink:#5c3d1e;--sub:#8a6a3f;
- --cell:#fffdf2;--cell-bd:#d9a05f;--cell-ink:#5c3d1e;--void:#b9884d;--kbd:#faf0d8e6;--kbd-bd:#d9a05f;--kbd-ink:#5c3d1e;
- --banner:#fff7d6;--banner-bd:#c05621;--banner-ink:#4a2a08;--tag:#c05621;--tag-ink:#fff;
- --hl:#fde68ab8;--hl-cur:#d97706;--ok:#c8e6c9b8;--ok-bd:#5e8c3e;--accent:#c05621;--accent-ink:#fff}
-/* 8 — نئون شب */
-.theme-8{--bg1:#0a0a12;--bg2:#131327;--panel:#16162aee;--panel-bd:#00e5ff44;--ink:#e8f6ff;--sub:#8ba7c7;
- --cell:#14141f;--cell-bd:#00e5ff59;--cell-ink:#e8f6ff;--void:#05050c;--kbd:#181828ee;--kbd-bd:#00e5ff3d;--kbd-ink:#c9f6ff;
- --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#00e5ff;--tag-ink:#04202a;
- --hl:#fde68a4d;--hl-cur:#00e5ff;--ok:#00ffc84d;--ok-bd:#00ffc8;--accent:#00e5ff;--accent-ink:#04202a}
-/* 9 — کهکشان */
-.theme-9{--bg1:#2a1b4d;--bg2:#4a2d7a;--panel:#f0e9ffdd;--panel-bd:#b48cff66;--ink:#2a1b4d;--sub:#5c4a8a;
- --cell:#ffffff;--cell-bd:#c4a8f0;--cell-ink:#2a1b4d;--void:#1c1035;--kbd:#e6dcffe6;--kbd-bd:#c4a8f0;--kbd-ink:#2a1b4d;
- --banner:#fff7d6;--banner-bd:#e5cf7c;--banner-ink:#3a2c05;--tag:#6b3fd4;--tag-ink:#fff;
- --hl:#fde68ab8;--hl-cur:#f59e0b;--ok:#a7f3d0b8;--ok-bd:#2f9e6a;--accent:#6b3fd4;--accent-ink:#fff}
-/* 10 — جشن طلایی */
-.theme-10{--bg1:#f7d774;--bg2:#edbd45;--panel:#fffdf0d9;--panel-bd:#b8860b;--ink:#4a3407;--sub:#7a5c1a;
- --cell:#fffdf0;--cell-bd:#d9b64a;--cell-ink:#4a3407;--void:#c99a2e;--kbd:#fdf5d8e6;--kbd-bd:#d9b64a;--kbd-ink:#4a3407;
- --banner:#ffffff;--banner-bd:#b8860b;--banner-ink:#4a3407;--tag:#b8860b;--tag-ink:#fff;
- --hl:#fde68ab8;--hl-cur:#d97706;--ok:#c8e6c9b8;--ok-bd:#5e8c3e;--accent:#b8860b;--accent-ink:#fff}
+/* ================= theme palette (10 levels — calm 2026 redesign) ============
+   One coherent family: deep calm nights + soft warm papers. Light cells on
+   dark themes (classic crossword paper-on-dark contrast), mint solved,
+   gentle gold active word, cream clue banner — like the reference design. */
+/* 1 — شب پرستاره (deep navy night) */
+.theme-1{--bg1:#0b1226;--bg2:#1a2a52;--panel:#0d1634ee;--panel-bd:#33477f66;--ink:#e8eeff;--sub:#93a5d8;
+ --cell:#f7f9ffef;--cell-bd:#c3cdf0;--cell-ink:#141b38;--void:#0d1735;--kbd:#0e1a3eee;--kbd-bd:#38518f80;--kbd-ink:#e6ecff;
+ --banner:#fbf3d9;--banner-bd:#e0cf8a;--banner-ink:#3a2e08;--tag:#1c2b5a;--tag-ink:#ffe9a0;
+ --hl:#fde9b399;--hl-cur:#e8b64c;--ok:#bfe8cfcc;--ok-bd:#57a77c;--accent:#7aa2ff;--accent-ink:#0c1230}
+/* 2 — غروم آرام (dusty dusk — replaces the harsh bright-sky theme) */
+.theme-2{--bg1:#1d2033;--bg2:#3a3f5c;--panel:#232742ee;--panel-bd:#4a507566;--ink:#e9eaf6;--sub:#a3a8c6;
+ --cell:#f7f6ffee;--cell-bd:#cfcddc;--cell-ink:#23263c;--void:#161a2e;--kbd:#252a47ee;--kbd-bd:#4c547e80;--kbd-ink:#e8e9f6;
+ --banner:#faf1dc;--banner-bd:#d9c98e;--banner-ink:#38300a;--tag:#39406b;--tag-ink:#f5e6b8;
+ --hl:#fbe3b599;--hl-cur:#d9a648;--ok:#bfe4d0cc;--ok-bd:#5aa07d;--accent:#8f9bd9;--accent-ink:#1d2033}
+/* 3 — کاغذ کرم (classic ivory paper) */
+.theme-3{--bg1:#f3ead3;--bg2:#e9dcc0;--panel:#faf5e6d9;--panel-bd:#b9ab86;--ink:#3b3323;--sub:#7a6f57;
+ --cell:#fffdf4;--cell-bd:#c9bb95;--cell-ink:#33301f;--void:#8f8261;--kbd:#f8f2e0e6;--kbd-bd:#c4b58c;--kbd-ink:#3b3323;
+ --banner:#fdf7e3;--banner-bd:#cbb77e;--banner-ink:#3a3010;--tag:#4a4130;--tag-ink:#f5eed8;
+ --hl:#efdc9fdd;--hl-cur:#a37f2a;--ok:#cfe6c9dd;--ok-bd:#5e8c52;--accent:#8a6d3b;--accent-ink:#fdf7e3}
+/* 4 — جنگل مه‌آلود (misty forest) */
+.theme-4{--bg1:#16241f;--bg2:#2c453c;--panel:#1a2a25ee;--panel-bd:#3d5a4f66;--ink:#e6f0ea;--sub:#9ab5aa;
+ --cell:#f4f8f5ef;--cell-bd:#c2cfc5;--cell-ink:#1c2a24;--void:#12211b;--kbd:#1b2e27ee;--kbd-bd:#40584bcc;--kbd-ink:#e4efe9;
+ --banner:#f8f2dc;--banner-bd:#d3c58a;--banner-ink:#35300f;--tag:#2c453c;--tag-ink:#e7f3ec;
+ --hl:#f2e6bc99;--hl-cur:#c9a949;--ok:#bfe6cdcc;--ok-bd:#5aa383;--accent:#7fbfa5;--accent-ink:#12211b}
+/* 5 — چای عصرگاهی (warm latte — replaces the loud brown) */
+.theme-5{--bg1:#e9dbc9;--bg2:#dbc7ac;--panel:#f7efe0d6;--panel-bd:#b39877;--ink:#3f3021;--sub:#7d6a55;
+ --cell:#fffaf3;--cell-bd:#c8ac87;--cell-ink:#3a2c1e;--void:#8f7455;--kbd:#f5ebdae6;--kbd-bd:#c6a988;--kbd-ink:#3f3021;
+ --banner:#faf0d6;--banner-bd:#cfb47c;--banner-ink:#3a2f10;--tag:#5c4630;--tag-ink:#f4e8d2;
+ --hl:#f5ddb0dd;--hl-cur:#a37e28;--ok:#cde4cbdd;--ok-bd:#5e8c54;--accent:#96703f;--accent-ink:#faf0d6}
+/* 6 — اقیانوس آرام (deep calm teal) */
+.theme-6{--bg1:#0b2b33;--bg2:#144e5a;--panel:#0e313bee;--panel-bd:#2c6a7566;--ink:#e4f2f5;--sub:#8fb5bd;
+ --cell:#f2fafcef;--cell-bd:#bcd9dd;--cell-ink:#0e2a30;--void:#082229;--kbd:#10333cee;--kbd-bd:#2f6d7980;--kbd-ink:#e2f0f3;
+ --banner:#f8f1da;--banner-bd:#d5c689;--banner-ink:#363010;--tag:#17505c;--tag-ink:#d9f2f5;
+ --hl:#f6e7bd99;--hl-cur:#cf9f43;--ok:#bde6d2cc;--ok-bd:#52a584;--accent:#66b8c4;--accent-ink:#082229}
+/* 7 — شامغاز بنفش (violet dusk — replaces the orange desert) */
+.theme-7{--bg1:#241d2e;--bg2:#3d3049;--panel:#292138ee;--panel-bd:#4f416066;--ink:#ece8f4;--sub:#a89fbd;
+ --cell:#f8f6fcef;--cell-bd:#d0c9dc;--cell-ink:#25202f;--void:#191423;--kbd:#2a2340ee;--kbd-bd:#54466880;--kbd-ink:#ebe7f4;
+ --banner:#f9f1dd;--banner-bd:#d8c790;--banner-ink:#382f0f;--tag:#3d3049;--tag-ink:#efe6f7;
+ --hl:#f6e5bb99;--hl-cur:#cda84c;--ok:#c2e5d0cc;--ok-bd:#5aa383;--accent:#9d8fc9;--accent-ink:#191423}
+/* 8 — نئون شب (calm neon night — kept, softened) */
+.theme-8{--bg1:#0a0e16;--bg2:#131a2a;--panel:#141a28ee;--panel-bd:#38c5d638;--ink:#e6f4f8;--sub:#8ba7b5;
+ --cell:#1b2638f2;--cell-bd:#4fd8e885;--cell-ink:#e8f6fa;--void:#04070d;--kbd:#161d2dee;--kbd-bd:#3ac6d640;--kbd-ink:#cdeef4;
+ --banner:#f5eed6;--banner-bd:#d3c486;--banner-ink:#3a3210;--tag:#123a42;--tag-ink:#c9f0f4;
+ --hl:#f2dfa899;--hl-cur:#49d7e6;--ok:#31e0a14d;--ok-bd:#31e0a1;--accent:#49d7e6;--accent-ink:#06232a}
+/* 9 — کهکشان (deep violet galaxy — softened) */
+.theme-9{--bg1:#1c1436;--bg2:#332a5c;--panel:#211a3eee;--panel-bd:#4a3f7566;--ink:#eae6f8;--sub:#a8a0cf;
+ --cell:#f7f5ffef;--cell-bd:#cfcaea;--cell-ink:#221a3c;--void:#150f2b;--kbd:#221c42ee;--kbd-bd:#4f467e80;--kbd-ink:#e8e5f6;
+ --banner:#f8f0da;--banner-bd:#d4c58c;--banner-ink:#373010;--tag:#332a5c;--tag-ink:#ece5fb;
+ --hl:#f4e2b899;--hl-cur:#c9a24a;--ok:#c0e3d0cc;--ok-bd:#59a385;--accent:#8f83cf;--accent-ink:#150f2b}
+/* 10 — طلای سپیده (soft champagne dawn — replaces the bright gold) */
+.theme-10{--bg1:#efe3c8;--bg2:#e3d1a8;--panel:#faf3dfd9;--panel-bd:#bda86f;--ink:#443619;--sub:#83704c;
+ --cell:#fffef6;--cell-bd:#cbb377;--cell-ink:#3a2e10;--void:#8f7a4e;--kbd:#f8f0d8e6;--kbd-bd:#c0a865;--kbd-ink:#443619;
+ --banner:#fdf8e6;--banner-bd:#c4ad6e;--banner-ink:#3c3212;--tag:#6b572b;--tag-ink:#f7efda;
+ --hl:#f3e0aadd;--hl-cur:#96701f;--ok:#cde4c9dd;--ok-bd:#5e8c54;--accent:#9a7b33;--accent-ink:#fdf8e6}
 
-/* decorative backgrounds (pure CSS, zero images) */
-.theme-1 #bg,.theme-6 #bg,.theme-8 #bg,.theme-9 #bg{background:radial-gradient(120% 90% at 50% 0%,var(--bg2) 0%,var(--bg1) 70%)}
-.theme-2 #bg{background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 62%,#f4faff 100%)}
+/* decorative backgrounds (pure CSS, zero images) — all calm gradients */
+.theme-1 #bg,.theme-4 #bg,.theme-6 #bg,.theme-7 #bg,.theme-8 #bg,.theme-9 #bg{background:radial-gradient(120% 90% at 50% 0%,var(--bg2) 0%,var(--bg1) 70%)}
+.theme-2 #bg{background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 68%)}
 .theme-3 #bg{background:
-  repeating-linear-gradient(0deg,#00000006 0 2px,transparent 2px 4px),
-  repeating-linear-gradient(90deg,#00000005 0 2px,transparent 2px 4px),
-  linear-gradient(160deg,var(--bg1),var(--bg2))}
-.theme-4 #bg{background:radial-gradient(140% 90% at 80% 0%,var(--bg2) 0%,var(--bg1) 75%)}
-.theme-5 #bg{background:
-  repeating-linear-gradient(93deg,#00000012 0 3px,transparent 3px 14px),
-  linear-gradient(170deg,var(--bg1),var(--bg2))}
-.theme-7 #bg{background:
-  radial-gradient(90% 44% at 50% 100%,#c99a2e33 0%,transparent 70%),
-  radial-gradient(120% 70% at 50% 0%,var(--bg2) 0%,var(--bg1) 80%)}
-.theme-10 #bg{background:
-  radial-gradient(60% 40% at 20% 10%,#fff8d699 0%,transparent 60%),
-  radial-gradient(80% 50% at 90% 90%,#c99a2e55 0%,transparent 60%),
-  linear-gradient(160deg,var(--bg1),var(--bg2))}
+  repeating-linear-gradient(0deg,#00000005 0 2px,transparent 2px 4px),
+  linear-gradient(165deg,var(--bg1),var(--bg2))}
+.theme-5 #bg{background:linear-gradient(170deg,var(--bg1) 0%,var(--bg2) 100%)}
+.theme-10 #bg{background:radial-gradient(140% 90% at 60% 0%,var(--bg2) 0%,var(--bg1) 78%)}
 /* tiny stars for the night / galaxy themes */
 .theme-1 #bg::after,.theme-9 #bg::after{content:"";position:absolute;inset:0;background-image:
   radial-gradient(1.5px 1.5px at 12% 18%,#fff9 50%,transparent 51%),
@@ -115,8 +108,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
   radial-gradient(1.5px 1.5px at 90% 82%,#fff4 50%,transparent 51%),
   radial-gradient(1px 1px at 18% 88%,#fff5 50%,transparent 51%);animation:twinkle 5s ease-in-out infinite alternate}
 .theme-8 #bg::after{content:"";position:absolute;inset:0;background-image:
-  radial-gradient(90% 40% at 50% 108%,#00e5ff1a 0%,transparent 60%),
-  radial-gradient(70% 34% at 18% -8%,#ff2fd01f 0%,transparent 60%)}
+  radial-gradient(90% 40% at 50% 108%,#49d7e612 0%,transparent 60%),
+  radial-gradient(70% 34% at 18% -8%,#c9a24a14 0%,transparent 60%)}
 @keyframes twinkle{from{opacity:.55}to{opacity:1}}
 
 /* ================= app shell ================= */
@@ -180,16 +173,17 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 .wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--hl-cur),var(--accent));background-size:200% 100%;transition:width .5s cubic-bezier(.2,.8,.3,1);animation:shimmer 2.6s linear infinite}
 @keyframes shimmer{to{background-position:-200% 0}}
 
-/* ---- keyboard ---- */
-.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;padding:2px 2px 0}
+/* ---- keyboard (standard 3-row Persian layout: 12 + 11 + 9+⌫) ---- */
+.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:3px 2px 0}
 .krow{display:flex;gap:5px;justify-content:center}
-.key{width:var(--kw);height:var(--kh);background:var(--kbd);border:1px solid var(--kbd-bd);border-radius:11px;font-size:calc(var(--kh)*.5);font-weight:700;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:0 2px 0 #00000022,inset 0 1px 0 #ffffff30;transition:transform .09s,filter .09s,background-color .5s;cursor:pointer;overflow:hidden}
+.key{flex:1 1 0;min-width:0;max-width:52px;height:var(--kh);background:var(--kbd);border:1px solid var(--kbd-bd);border-radius:12px;font-size:calc(var(--kh)*.52);font-weight:700;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:0 2px 0 #0000001f,inset 0 1px 0 #ffffff24;transition:transform .09s,filter .09s,background-color .5s;cursor:pointer;overflow:hidden}
 .key::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;transform:scale(.4);pointer-events:none}
-.key:active,.key.pressed{transform:scale(.86) translateY(2px);filter:brightness(1.18);box-shadow:0 0 0 #00000022}
+.key:active,.key.pressed{transform:scale(.86) translateY(2px);filter:brightness(1.18);box-shadow:0 0 0 #0000001f}
 .key.pressed::after{animation:ripple .32s ease-out}
 @keyframes ripple{from{opacity:.22;transform:scale(.4)}to{opacity:0;transform:scale(1.2)}}
-.key.bk{flex:1;width:auto;font-size:.92rem;gap:7px;display:flex;align-items:center;justify-content:center}
-.key.bk svg{width:20px;height:20px;fill:currentColor}
+/* wide icon-only backspace at the end (far-left in RTL) of the bottom row */
+.key.bk{max-width:78px}
+.key.bk svg{width:55%;height:55%;max-width:26px;max-height:26px;fill:currentColor}
 
 /* ================= full screens (gate / loading / error) ================= */
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;padding:26px;text-align:center;z-index:50}
@@ -403,11 +397,15 @@ function tgOpen(url){ try{ TG && TG.openTelegramLink ? TG.openTelegramLink(url) 
 const $ = id => document.getElementById(id);
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const fa = n => String(n).replace(/\d/g, d => FA_DIGITS[+d]);
-/* the 32-letter Persian alphabet — DICTIONARY order, 4 rows of 8 */
+/* the 32-letter Persian alphabet — STANDARD 3-row keyboard layout
+   (ISIRI 9147, exactly like Gboard/Telegram's Persian keyboard) */
 const ALPHABET = ["ا","ب","پ","ت","ث","ج","چ","ح","خ","د","ذ","ر","ز","ژ","س","ش",
                   "ص","ض","ط","ظ","ع","غ","ف","ق","ک","گ","ل","م","ن","و","ه","ی"];
-const KEY_ROWS = [ALPHABET.slice(0,8), ALPHABET.slice(8,16),
-                  ALPHABET.slice(16,24), ALPHABET.slice(24,32)];
+const KEY_ROWS = [
+  ["ض","ص","ث","ق","ف","غ","ع","ه","خ","ح","ج","چ"],          // 12 keys
+  ["ش","س","ی","ب","ل","ا","ت","ن","م","ک","گ"],               // 11 keys
+  ["ظ","ط","ز","ر","ذ","د","پ","و","ژ"],                       // 9 keys + ⌫
+];
 const SIZE = 8;
 
 function tehranDate(){
@@ -451,10 +449,12 @@ function decodeWord(b64, key){
    DIRECTLY in this same window, every time. Only when it is missing or
    expired does the short join screen appear (join + one tap to re-verify
    in the bot chat, which auto-checks membership).
+   2026-10-08: TTL raised to 30 days — the gate almost never interrupts a
+   member now; anyone who LEAVES the channel is cut off within 30 days.
    ST_MAX_WINDOW_SEC also rejects tokens whose exp is too far in the future,
    so tightening the bot-side TTL cuts off already-issued tokens at once.
-   Keep it above the bot's TOKEN_TTL (currently 3 days). */
-const ST_MAX_WINDOW_SEC = 3.5 * 86400;
+   Keep it above the bot's TOKEN_TTL (currently 30 days). */
+const ST_MAX_WINDOW_SEC = 31 * 86400;
 function stValid(st, uid){
   if(!st) return false;
   const parts = st.split(".");
@@ -608,8 +608,8 @@ let day = null, models = [], pIdx = 0, P = null, cur = null;
 let typedCells = {};          // "r,c" -> letter  (current puzzle)
 let progress = {cur:0, typed:{}};
 let completeCache = {};       // puzzle n -> bool
-const THEME_HEAD = {1:"#0c1230",2:"#8ec9ff",3:"#efe9dc",4:"#e8f5e0",5:"#a9764f",
-                    6:"#0e5f6e",7:"#f2dcae",8:"#0a0a12",9:"#2a1b4d",10:"#f7d774"};
+const THEME_HEAD = {1:"#0b1226",2:"#1d2033",3:"#f3ead3",4:"#16241f",5:"#e9dbc9",
+                    6:"#0b2b33",7:"#241d2e",8:"#0a0e16",9:"#1c1436",10:"#efe3c8"};
 
 /* ================= dynamic layout (grid + keyboard ALWAYS fit) ================= */
 function layout(){
@@ -623,25 +623,24 @@ function layout(){
   const appCS = getComputedStyle($("app"));
   const padV = (parseFloat(appCS.paddingTop)||5) + (parseFloat(appCS.paddingBottom)||4); // includes safe-area inset
   const gapV = (parseFloat(appCS.rowGap)||6) * 4;   // gaps between the 5 sections
-  const kbdChrome = 2 + 4*5;          // kbd top pad + 5px gaps * 4 between rows
+  const kbdChrome = 3 + 3*6;          // kbd top pad + 6px gaps * 2 between the 3 rows
   const gridGaps = 7 * 3;
   const avail = vh - banner - status - wprog - padV - gapV;
-  let kh = Math.floor((avail * 0.40 - kbdChrome) / 5);
-  let csz = Math.floor(Math.min((avail * 0.60 - gridGaps) / 8,
+  let kh = Math.floor((avail * 0.42 - kbdChrome) / 3);
+  let csz = Math.floor(Math.min((avail * 0.58 - gridGaps) / 8,
                                 (vw - 12 - 7*3) / 8));
-  kh = Math.max(28, Math.min(48, kh));
+  kh = Math.max(30, Math.min(56, kh));
   csz = Math.max(26, Math.min(47, csz));
   /* give leftovers to whichever is starving */
-  const used = csz*8 + gridGaps + kh*5 + kbdChrome;
+  const used = csz*8 + gridGaps + kh*3 + kbdChrome;
   if(avail - used > 3){
     const extra = avail - used;
     csz = Math.min(47, csz + Math.floor(extra*0.55/8));
-    kh = Math.min(52, kh + Math.floor(extra*0.45/5));
+    kh = Math.min(60, kh + Math.floor(extra*0.45/3));
   }
   const rs = document.documentElement.style;
   rs.setProperty("--csz", csz+"px");
   rs.setProperty("--kh", kh+"px");
-  rs.setProperty("--kw", Math.floor((vw - 12 - 7*5)/8)+"px");
 }
 let layoutRaf = 0;
 function scheduleLayout(){
@@ -688,21 +687,23 @@ function renderGrid(){
 function renderKeyboard(){
   const kbd = $("kbd");
   kbd.innerHTML = "";
-  KEY_ROWS.forEach(row=>{
+  KEY_ROWS.forEach((row, ri)=>{
     const rEl = document.createElement("div"); rEl.className="krow";
     row.forEach(ch=>{
       const k = document.createElement("button"); k.className="key"; k.textContent = ch;
       k.addEventListener("pointerdown", e=>{ e.preventDefault(); pressFx(k); typeLetter(ch); });
       rEl.appendChild(k);
     });
+    if(ri === KEY_ROWS.length - 1){
+      /* ⌫ lives at the END (far left in RTL) of the bottom row — exactly
+         like the reference keyboard: wide icon-only backspace key */
+      const bk = document.createElement("button"); bk.className="key bk";
+      bk.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 5H9a2 2 0 0 0-1.6.8L1.4 12l6 6.2A2 2 0 0 0 9 19h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-4 10.6-1.4 1.4L13.5 14l-3.1 3-1.4-1.4 3.1-3.1-3.1-3.1 1.4-1.4 3.1 3.1 3.1-3.1 1.4 1.4-3.1 3.1z"/></svg>';
+      bk.addEventListener("pointerdown", e=>{ e.preventDefault(); pressFx(bk); backspace(); });
+      rEl.appendChild(bk);
+    }
     kbd.appendChild(rEl);
   });
-  const rEl = document.createElement("div"); rEl.className="krow";
-  const bk = document.createElement("button"); bk.className="key bk";
-  bk.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 5H9a2 2 0 0 0-1.6.8L1.4 12l6 6.2A2 2 0 0 0 9 19h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-4 10.6-1.4 1.4L13.5 14l-3.1 3-1.4-1.4 3.1-3.1-3.1-3.1 1.4-1.4 3.1 3.1 3.1-3.1 1.4 1.4-3.1 3.1z"/></svg><span>پاک‌کردن</span>';
-  bk.addEventListener("pointerdown", e=>{ e.preventDefault(); pressFx(bk); backspace(); });
-  rEl.appendChild(bk);
-  kbd.appendChild(rEl);
 }
 function pressFx(el){
   el.classList.add("pressed");
@@ -1069,6 +1070,24 @@ async function boot(){
       toast("عضویت در چت ربات بررسی می‌شود…");
       setTimeout(()=>tgOpen(BOT_LINK + "?start=check"), 400);
     });
+    /* ── auto-recovery (2026-10-08): the "double window" fix ──
+       After the user re-verifies in the bot chat, the fresh window (or the
+       refreshed menu button) stores a new token in the SHARED localStorage.
+       The moment this gate window regains focus/visibility — or a storage
+       event arrives — we re-check and reload straight into the game. No
+       more stale gate windows left behind. */
+    const recheckGate = ()=>{
+      try{
+        const saved = localStorage.getItem(stKey());
+        if(saved && stValid(saved, userId())){ location.reload(); return; }
+        const qs = new URLSearchParams(location.search);
+        const st = qs.get("st");
+        if(st && stValid(st, userId())) location.reload();
+      }catch(e){}
+    };
+    document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) recheckGate(); });
+    window.addEventListener("focus", recheckGate);
+    window.addEventListener("storage", e=>{ if(e.key === stKey()) recheckGate(); });
     return;
   }
   show("loading");
