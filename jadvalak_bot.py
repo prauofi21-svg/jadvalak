@@ -24,7 +24,7 @@ Run modes (env):
     CHECKER_TOKENS     comma-separated admin-bot tokens (first = jadvalak itself)
     GATE_CHAT_ID       channel id, e.g. -1001234567890  (required)
     APP_URL            https URL of the mini app        (required)
-    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 4320 = 3 days)
+    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 43200 = 30 days)
     RUNTIME_MINUTES    how long to poll this instance   (default 345)
     START_OFFSET       getUpdates offset to resume from (default -1)
     GH_TOKEN / GATEWAY_REPO / GATEWAY_WORKFLOW — used to write the chain
@@ -57,7 +57,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "4320"))   # 3 days: members re-enter directly; anyone who LEAVES the channel is cut off within 3 days (bot re-issues tokens only after a successful membership check)
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "43200"))  # 30 days: members re-enter directly for a whole month; anyone who LEAVES the channel is cut off within 30 days (bot re-issues tokens only after a successful membership check)
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 
