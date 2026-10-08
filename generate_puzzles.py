@@ -1061,6 +1061,25 @@ for _k, _extra in BUILTIN_EXTRA5.items():
     BUILTIN.setdefault(_k, []).extend(
         (w, c) for w, c in _extra if w not in _have)
 
+# v4 (2026-10-08) — 1000-word deep expansion (bank_v4.py, sibling module).
+# Why: used_words.json hit 1028 entries and only 13 fresh builtin words were
+# left — the offline layer and the emergency-reserve top-up that draws from
+# it were exhausted. bank_v4.py adds ~1000 hand-authored, fact-checked pairs
+# with zero overlap against the old bank and the used-words history. The
+# import is defensive: if the file ever goes missing the pipeline keeps
+# working on the previous bank (but logs loudly, because that means the
+# deploy lost a file).
+try:
+    from bank_v4 import BANK_V4
+except ImportError:  # pragma: no cover - deploy integrity guard
+    BANK_V4 = {}
+    logging.getLogger(__name__).warning(
+        "bank_v4.py is missing — offline bank NOT expanded")
+for _k, _extra in BANK_V4.items():
+    _have = {w for w, _ in BUILTIN.get(_k, [])}
+    BUILTIN.setdefault(_k, []).extend(
+        (w, c) for w, c in _extra if w not in _have)
+
 # clean the merged bank: 32-letter alphabet + structural rules
 # (3-8 letters, no function words, no Latin/digits) + (word, clue) swaps
 for k in list(BUILTIN):
