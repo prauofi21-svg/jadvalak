@@ -173,17 +173,22 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 .wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--hl-cur),var(--accent));background-size:200% 100%;transition:width .5s cubic-bezier(.2,.8,.3,1);animation:shimmer 2.6s linear infinite}
 @keyframes shimmer{to{background-position:-200% 0}}
 
-/* ---- keyboard (standard 3-row Persian layout: 12 + 11 + 9+⌫) ---- */
-.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:3px 2px 0}
-.krow{display:flex;gap:5px;justify-content:center}
-.key{flex:1 1 0;min-width:0;max-width:52px;height:var(--kh);background:var(--kbd);border:1px solid var(--kbd-bd);border-radius:12px;font-size:calc(var(--kh)*.52);font-weight:700;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:0 2px 0 #0000001f,inset 0 1px 0 #ffffff24;transition:transform .09s,filter .09s,background-color .5s;cursor:pointer;overflow:hidden}
-.key::after{content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;transform:scale(.4);pointer-events:none}
-.key:active,.key.pressed{transform:scale(.86) translateY(2px);filter:brightness(1.18);box-shadow:0 0 0 #0000001f}
-.key.pressed::after{animation:ripple .32s ease-out}
-@keyframes ripple{from{opacity:.22;transform:scale(.4)}to{opacity:0;transform:scale(1.2)}}
-/* wide icon-only backspace at the end (far-left in RTL) of the bottom row */
-.key.bk{max-width:78px}
-.key.bk svg{width:55%;height:55%;max-width:26px;max-height:26px;fill:currentColor}
+/* ---- keyboard — EXACT replica of the user's reference image (2026-10-08):
+   LEFT-TO-RIGHT 3-row layout 11 + 11 + 10 letters + wide ⌫ at the FAR RIGHT
+   of the bottom row. Keys are INVISIBLE at rest (letters float on the page
+   background, exactly like the reference: no keycaps, no borders) with airy
+   vertical spacing; a soft halo + press scale give touch feedback. ---- */
+.kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 0;direction:ltr}
+.krow{display:flex;gap:4px;justify-content:center}
+.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:transparent;border:none;border-radius:14px;font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;transition:transform .09s,filter .09s;cursor:pointer;overflow:hidden}
+.key::after{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--kbd);opacity:0;transform:scale(.55);pointer-events:none}
+.key:active,.key.pressed{transform:scale(1.14);filter:brightness(1.22)}
+.key.pressed::after{animation:halo .34s ease-out}
+@keyframes halo{from{opacity:.5;transform:scale(.55)}to{opacity:0;transform:scale(1.18)}}
+/* wide icon-only backspace at the END of the bottom row — FAR RIGHT in the
+   keyboard's LTR direction, exactly like the reference image */
+.key.bk{max-width:86px}
+.key.bk svg{width:58%;height:58%;max-width:30px;max-height:30px;fill:currentColor}
 
 /* ================= full screens (gate / loading / error) ================= */
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;padding:26px;text-align:center;z-index:50}
@@ -385,6 +390,37 @@ function tgReady(){
   try{ TG && TG.setVerticalSwipesEnabled && TG.setVerticalSwipesEnabled(false); }catch(e){}
   try{ TG && TG.disableVerticalSwipes && TG.disableVerticalSwipes(); }catch(e){}
 }
+
+/* ================= app version & self-heal (2026-10-08 cache cure) =================
+   Telegram's WebView caches mini-app HTML far longer than the HTTP headers
+   say (users were still running days-old code). Cure: version.json in the
+   repo is always fetched FRESH (cache-buster + no-store — data fetches were
+   never affected, only the HTML). If the running page is older than the
+   repo's version, we immediately re-open ourselves with ?v=<latest> — a URL
+   the WebView has never seen, so it is guaranteed to be a cache MISS and
+   pulls the latest HTML. Future deploys only need to bump BOTH APP_V here
+   and version.json. */
+const APP_V = "2026.10.08.1";
+let bootGate = Promise.resolve();
+(function selfHeal(){
+  try{
+    const qs = new URLSearchParams(location.search);
+    if(qs.get("v")) return;                 /* already cache-busted — fresh for sure */
+    const timeout = new Promise(res=>setTimeout(res, 1500));
+    const check = fetch("version.json?t=" + Date.now(), {cache:"no-store"})
+      .then(r => r.ok ? r.json() : null)
+      .then(v => {
+        if(v && v.v && v.v !== APP_V){
+          const rest = location.search.slice(1);
+          location.replace(location.pathname + "?v=" + encodeURIComponent(v.v) +
+                           (rest ? "&" + rest : "") + location.hash);
+          return new Promise(res=>setTimeout(res, 1500)); /* if replace failed, boot anyway */
+        }
+      })
+      .catch(()=>{});
+    bootGate = Promise.race([check, timeout]);
+  }catch(e){}
+})();
 function haptic(kind, style){
   try{
     if(kind==="impact") TG.HapticFeedback.impactOccurred(style||"light");
@@ -397,14 +433,16 @@ function tgOpen(url){ try{ TG && TG.openTelegramLink ? TG.openTelegramLink(url) 
 const $ = id => document.getElementById(id);
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const fa = n => String(n).replace(/\d/g, d => FA_DIGITS[+d]);
-/* the 32-letter Persian alphabet — STANDARD 3-row keyboard layout
-   (ISIRI 9147, exactly like Gboard/Telegram's Persian keyboard) */
+/* the 32-letter Persian alphabet — keyboard replica of the user's reference
+   image (2026-10-08): LEFT-TO-RIGHT rows of 11 + 11 + 10 letters, with چ in
+   the bottom row (after پ) and a wide icon-only ⌫ closing the row at the far
+   right. Verified against the reference image cell-by-cell. */
 const ALPHABET = ["ا","ب","پ","ت","ث","ج","چ","ح","خ","د","ذ","ر","ز","ژ","س","ش",
                   "ص","ض","ط","ظ","ع","غ","ف","ق","ک","گ","ل","م","ن","و","ه","ی"];
 const KEY_ROWS = [
-  ["ض","ص","ث","ق","ف","غ","ع","ه","خ","ح","ج","چ"],          // 12 keys
+  ["ض","ص","ث","ق","ف","غ","ع","ه","خ","ح","ج"],          // 11 keys
   ["ش","س","ی","ب","ل","ا","ت","ن","م","ک","گ"],               // 11 keys
-  ["ظ","ط","ز","ر","ذ","د","پ","و","ژ"],                       // 9 keys + ⌫
+  ["ظ","ط","ز","ر","ذ","د","پ","چ","و","ژ"],                   // 10 keys + ⌫
 ];
 const SIZE = 8;
 
@@ -449,12 +487,15 @@ function decodeWord(b64, key){
    DIRECTLY in this same window, every time. Only when it is missing or
    expired does the short join screen appear (join + one tap to re-verify
    in the bot chat, which auto-checks membership).
-   2026-10-08: TTL raised to 30 days — the gate almost never interrupts a
-   member now; anyone who LEAVES the channel is cut off within 30 days.
-   ST_MAX_WINDOW_SEC also rejects tokens whose exp is too far in the future,
-   so tightening the bot-side TTL cuts off already-issued tokens at once.
-   Keep it above the bot's TOKEN_TTL (currently 30 days). */
-const ST_MAX_WINDOW_SEC = 31 * 86400;
+   2026-10-08 v2 (three-layer "never again" fix):
+     1. TOKEN_TTL raised to 365 days — members re-enter directly for a year.
+     2. ST_MAX_WINDOW_SEC tracks it (366 days) so long tokens stay valid.
+     3. RETURNING-PLAYER FLAG: anyone who has played once (flag in localStorage
+        AND Telegram CloudStorage, so it survives cache clears and follows the
+        user across devices) enters the game directly even if every token has
+        expired — the gate page can NEVER interrupt a returning player again.
+        First-time visitors still see the join flow (that is the funnel). */
+const ST_MAX_WINDOW_SEC = 366 * 86400;
 function stValid(st, uid){
   if(!st) return false;
   const parts = st.split(".");
@@ -463,7 +504,27 @@ function stValid(st, uid){
   return t === uid && exp > now && exp - now <= ST_MAX_WINDOW_SEC && parts[2].length > 20;
 }
 function stKey(){ return "jk:st:" + userId(); }
-function gateState(){
+function playedKey(){ return "jk:played:" + userId(); }
+function setPlayedFlag(){
+  try{ localStorage.setItem(playedKey(), "1"); }catch(e){}
+  try{ TG.CloudStorage.setItem("jk:played", "1", ()=>{}); }catch(e){}
+}
+function localPlayed(){
+  try{ return localStorage.getItem(playedKey()) === "1"; }catch(e){ return false; }
+}
+function cloudPlayed(){
+  return new Promise(res=>{
+    let done = false;
+    const t = setTimeout(()=>{ if(!done){ done=true; res(false); } }, 1500);
+    try{
+      TG.CloudStorage.getItem("jk:played", (err, val)=>{
+        if(done) return; done = true; clearTimeout(t);
+        res(!err && val === "1");
+      });
+    }catch(e){ if(!done){ done=true; res(false); } }
+  });
+}
+async function gateState(){
   const user = TG && TG.initDataUnsafe && TG.initDataUnsafe.user;
   if(!user || !user.id) return "no-tg";
   const qs = new URLSearchParams(location.search);
@@ -476,6 +537,9 @@ function gateState(){
     const saved = localStorage.getItem(stKey());
     if(stValid(saved, user.id)) return "app";
   }catch(e){}
+  /* returning player — verified at least once in the past: straight in */
+  if(localPlayed()) return "app";
+  if(await cloudPlayed()) return "app";
   return "gate";
 }
 function userId(){ const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user; return u && u.id ? u.id : 0; }
@@ -623,7 +687,7 @@ function layout(){
   const appCS = getComputedStyle($("app"));
   const padV = (parseFloat(appCS.paddingTop)||5) + (parseFloat(appCS.paddingBottom)||4); // includes safe-area inset
   const gapV = (parseFloat(appCS.rowGap)||6) * 4;   // gaps between the 5 sections
-  const kbdChrome = 3 + 3*6;          // kbd top pad + 6px gaps * 2 between the 3 rows
+  const kbdChrome = 6 + 3*10;         // kbd top pad + 10px gaps * 2 between the 3 rows (airy, like the reference)
   const gridGaps = 7 * 3;
   const avail = vh - banner - status - wprog - padV - gapV;
   let kh = Math.floor((avail * 0.42 - kbdChrome) / 3);
@@ -695,8 +759,8 @@ function renderKeyboard(){
       rEl.appendChild(k);
     });
     if(ri === KEY_ROWS.length - 1){
-      /* ⌫ lives at the END (far left in RTL) of the bottom row — exactly
-         like the reference keyboard: wide icon-only backspace key */
+      /* ⌫ lives at the END of the bottom row — FAR RIGHT in the keyboard's
+         LTR direction, exactly like the reference image: wide icon-only key */
       const bk = document.createElement("button"); bk.className="key bk";
       bk.innerHTML = '<svg viewBox="0 0 24 24"><path d="M22 5H9a2 2 0 0 0-1.6.8L1.4 12l6 6.2A2 2 0 0 0 9 19h13a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-4 10.6-1.4 1.4L13.5 14l-3.1 3-1.4-1.4 3.1-3.1-3.1-3.1 1.4-1.4 3.1 3.1 3.1-3.1 1.4 1.4-3.1 3.1z"/></svg>';
       bk.addEventListener("pointerdown", e=>{ e.preventDefault(); pressFx(bk); backspace(); });
@@ -1052,7 +1116,8 @@ function show(id){
 async function boot(){
   tgReady();
   document.addEventListener("contextmenu", e=>e.preventDefault());
-  const gs = gateState();
+  const gs = await gateState();
+  if(gs === "app") setPlayedFlag();   /* returning player — never gate again */
   if(gs === "no-tg"){
     show("no-tg");
     $("btn-open-bot").addEventListener("click", ()=>{ location.href = BOT_LINK; });
@@ -1080,6 +1145,7 @@ async function boot(){
       try{
         const saved = localStorage.getItem(stKey());
         if(saved && stValid(saved, userId())){ location.reload(); return; }
+        if(localPlayed()){ location.reload(); return; }
         const qs = new URLSearchParams(location.search);
         const st = qs.get("st");
         if(st && stValid(st, userId())) location.reload();
@@ -1156,7 +1222,7 @@ async function boot(){
   setTimeout(layout, 350);   /* after WebView settles */
 }
 
-document.addEventListener("DOMContentLoaded", boot);
+document.addEventListener("DOMContentLoaded", ()=>{ bootGate.then(()=>boot()); });
 </script>
 </body>
 </html>
