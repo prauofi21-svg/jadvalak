@@ -10,9 +10,11 @@ Responsibilities:
     so a user who leaves the channel must rejoin to get back in.
   - The mini-app button URL carries a signed, expiring access token
     (?st=uid.exp.sig) that the app validates (uid bound to initData,
-    expiry, format). TTL default: 30 days — the app also keeps the token
-    in localStorage, so members enter the game directly on every open;
-    the gate page only appears for users who have not joined yet.
+    expiry, format) PLUS a cache-busting version param (&v=...) so
+    Telegram's WebView always fetches fresh HTML. TTL default: 365 days —
+    the app also keeps the token in localStorage and a returning-player
+    flag, so members enter the game directly on every open; the gate page
+    only appears for first-time visitors.
   - "I joined" inline button: re-checks membership instantly.
   - /about: "طراحی، ساخت و اجرا توسط @factcaster"
   - Membership checks use a list of bot tokens (any bot that is an admin of
@@ -24,7 +26,7 @@ Run modes (env):
     CHECKER_TOKENS     comma-separated admin-bot tokens (first = jadvalak itself)
     GATE_CHAT_ID       channel id, e.g. -1001234567890  (required)
     APP_URL            https URL of the mini app        (required)
-    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 43200 = 30 days)
+    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 525600 = 365 days)
     RUNTIME_MINUTES    how long to poll this instance   (default 345)
     START_OFFSET       getUpdates offset to resume from (default -1)
     GH_TOKEN / GATEWAY_REPO / GATEWAY_WORKFLOW — used to write the chain
@@ -57,7 +59,8 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "43200"))  # 30 days: members re-enter directly for a whole month; anyone who LEAVES the channel is cut off within 30 days (bot re-issues tokens only after a successful membership check)
+APP_V = "2026.10.08.1"   # deploy version — keep in sync with index.html APP_V and version.json
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: members re-enter directly for a whole year; the mini app ALSO keeps a returning-player flag (localStorage + CloudStorage), so even an expired token never re-shows the gate to someone who has played before
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 
@@ -329,7 +332,13 @@ def make_access_token(user_id: int, ttl_min: int = TOKEN_TTL_MIN) -> str:
 
 
 def app_url_for(user_id: int) -> str:
-    return f"{APP_URL}?st={make_access_token(user_id)}"
+    """App URL with a fresh signed token AND the deploy version param.
+    The &v= param matters: Telegram's WebView caches mini-app HTML far
+    longer than HTTP headers allow. A URL carrying a NEW version string is
+    a guaranteed cache miss, so every button the bot issues after a deploy
+    opens the LATEST code. Keep APP_V in sync with index.html/version.json."""
+    sep = "&" if "?" in APP_URL else "?"
+    return f"{APP_URL}{sep}st={make_access_token(user_id)}&v={APP_V}"
 
 
 def set_menu_button(chat_id: int, user_id: int) -> None:
