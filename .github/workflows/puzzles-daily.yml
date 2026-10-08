@@ -80,6 +80,9 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # dumb terminal + unset EDITOR made `git rebase --continue` abort
+          # mid-conflict-resolution (2026-10-08 push race) — never again:
+          git config core.editor true
           git add data/ || true
           if git diff --cached --quiet; then
             echo "data unchanged — nothing to commit"
@@ -99,6 +102,6 @@ jobs:
             # resolve any data/ conflict by keeping our freshly generated version
             git checkout --theirs -- data/ 2>/dev/null || true
             git add -A data/ 2>/dev/null || true
-            git rebase --continue || true
+            git -c core.editor=true rebase --continue || true
           done
           git push origin main
