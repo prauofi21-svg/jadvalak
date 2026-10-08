@@ -521,6 +521,41 @@ _FACT_ORD_RE = re.compile(
 # («ماه پس از مرداد»، «سیارهٔ همسایهٔ زمین») — never drop those.
 _FACT_RELATIONAL = ("پس از", "پیش از", "قبل", "بعد", "همسایه", "کنار")
 
+# --- curated superlative records (2026-10-08 «شیرمرغ ← بزرگ‌ترین پرندهٔ دریایی») ---
+# Open-world record claims are the other hallucination lane: production
+# shipped «شیرمرغ» (the skua — a mid-sized predatory seabird) labeled
+# «بزرگ‌ترین پرندهٔ دریایی»; that record belongs to the albatross (wingspan
+# up to ~3.5 m). Tokens are matched against the NORMALIZED clue (ZWNJ
+# stripped → «بزرگترین»); every req must appear, no forb may. holders =
+# acceptable answers — a matching claim on any other answer is dropped,
+# the same policy as the wrong-member drop above. Descriptive clues
+# («پرندهٔ دریایی درنده», «باز بزرگ آسمان») carry no superlative token and
+# stay untouched. Claims scoping to another reference («نزدیک‌ترین سیاره
+# به زمین», «بلندترین کوه ایران») are exempt via forb tokens because they
+# have different holders.
+FACT_RECORDS = [
+    # بزرگ‌ترین پرندهٔ دریایی — آلباتروس holds the record, and آ is not
+    # even on the 32-key keyboard, so ANY answer with this claim drops.
+    (("آلباتروس",), ("بزرگترین", "پرنده", "دریایی"), ()),
+    (("شترمرغ",), ("بزرگترین", "پرنده"), ("دریایی",)),
+    (("نهنگ آبی", "نهنگ"), ("بزرگترین", "پستاندار"), ("خشکی",)),
+    (("فیل آفریقایی", "فیل"), ("بزرگترین", "پستاندار", "خشکی"), ()),
+    (("نهنگ آبی", "نهنگ"), ("بزرگترین", "جاندار"), ()),
+    (("زرافه",), ("بلندترین", "حیوان"), ()),
+    (("یوزپلنگ",), ("سریعترین", "خشکی"), ()),
+    (("شاهین", "باز شاهین"), ("سریعترین", "پرنده"), ()),
+    (("دلفین",), ("هوشمندترین", "پستاندار", "دریا"), ()),
+    (("دماوند",), ("بلندترین", "کوه", "ایران"), ()),
+    (("اورست",), ("بلندترین", "کوه"), ("ایران", "آتش")),
+    (("مشتری",), ("بزرگترین", "سیاره"), ()),
+    (("عطارد",), ("کوچکترین", "سیاره"), ()),
+    (("عطارد",), ("نزدیکترین", "سیاره"), ("زمین",)),
+    (("نپتون",), ("دورترین", "سیاره"), ()),
+    (("صحرا",), ("بزرگترین", "بیابان"), ("ایران",)),
+    (("کوسه نهنگ", "کوسه"), ("بزرگترین", "ماهی"), ()),
+    (("نیل",), ("بلندترین", "رود"), ("ایران",)),
+]
+
 
 def _fact_ord_word(n: int, suffix_in: bool = False) -> str:
     base = {1: "نخست", 2: "دوم", 3: "سوم", 4: "چهارم", 5: "پنجم", 6: "ششم",
@@ -534,12 +569,13 @@ def _fact_ord_word(n: int, suffix_in: bool = False) -> str:
 
 
 def fact_fix_clue(word: str, clue: str) -> str | None:
-    """Deterministic closed-set fact gate.
+    """Deterministic closed-set + superlative-record fact gate.
 
     Returns the (possibly corrected) clue, or None when the pair must be
     dropped. Runs on EVERY path a clue can take — LLM candidates, the builtin
     bank at import time, reserve adoption, kept-puzzle reload and the final
-    per-puzzle check — so a wrong ordinal can physically no longer ship."""
+    per-puzzle check — so a wrong ordinal or a wrong record claim can
+    physically no longer ship."""
     clue = (clue or "").strip()
     nw = normalize_word(word or "")
     nc = normalize_word(clue)
@@ -566,6 +602,16 @@ def fact_fix_clue(word: str, clue: str) -> str | None:
                     clue = clue.replace(
                         mo.group(0),
                         _fact_ord_word(idx, mo.group(0).endswith("ین")), 1)
+
+    # (c) curated superlative records: a «بزرگ‌ترین/سریع‌ترین/…» claim that
+    #     matches a known record pattern must name the record holder —
+    #     anything else is hallucinated and dropped (2026-10-08:
+    #     شیرمرغ ≠ بزرگ‌ترین پرندهٔ دریایی). Auto-correction is impossible
+    #     here (the holder usually cannot fit the grid), so the pair dies.
+    for holders, req, forb in FACT_RECORDS:
+        if all(k in nc for k in req) and not any(f in nc for f in forb):
+            if nw not in {normalize_word(h) for h in holders}:
+                return None
     return clue
 
 
