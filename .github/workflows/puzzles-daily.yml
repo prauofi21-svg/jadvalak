@@ -1,11 +1,16 @@
 name: Daily puzzles
 
-# Generates the crossword day files with GitHub-hosted runners + Groq LLM.
+# Generates the crossword day files with GitHub-hosted runners + LLM.
 #   23:00 Tehran (19:30 UTC)  — main evening run (tomorrow's file)
 #   01:00 Tehran (21:30 UTC)  — backup evening run
 #   07:00 Tehran (03:30 UTC)  — morning catch-up (heals any failed evening)
 # The generator is idempotent: an existing day file (>= 6 puzzles) is NEVER
 # overwritten, so extra runs can never change the day's puzzles mid-day.
+# LLM provider: Gemini when the GEMINI_API_KEY secret is set (recommended —
+# stronger Persian factual quality), else Groq; the other one is the
+# automatic fallback. Ordinal facts (months / weekdays / seasons / planets)
+# are verified by a DETERMINISTIC gate in generate_puzzles.py, so wrong
+# ordinals like «خرداد = ماه دوم» can no longer ship from any provider.
 
 on:
   schedule:
@@ -52,13 +57,14 @@ jobs:
       - name: Generate puzzles
         env:
           GROK_API_KEY: ${{ secrets.GROK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DATE_ARG: ${{ inputs.date }}
           FORCE_ARG: ${{ inputs.force && '--force' || '' }}
           KEEP_ARG: ${{ inputs.keep_first || '0' }}
         # Layer 1: LLM pipeline (best clue quality).
         # Layer 2: offline builtin-bank fallback — if the LLM pipeline fails
         # (rate limits, quota, obscure words that refuse to interlock), the
-        # day files are still guaranteed from the 299-word offline bank, so
+        # day files are still guaranteed from the 775-word offline bank, so
         # the mini app NEVER opens to an empty day. Both layers are
         # idempotent: an existing day file (>= 6 puzzles) is never touched.
         run: |
