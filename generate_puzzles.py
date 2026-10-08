@@ -179,22 +179,40 @@ VALIDATOR_MODEL = "openai/gpt-oss-120b"
 _MODEL_IDS: dict = {}     # provider name -> listed model ids (cache)
 _MODELS: dict = {}        # provider name -> chosen primary model id
 
+# Rate-limit circuit breaker (2026-10-08): on the free Gemini tier the
+# generator fires more calls per minute than the quota allows. Each fully
+# rate-limited call burns ~140s in 429 retries BEFORE falling back to Groq —
+# with ~50 calls a run that could exceed the 90-minute workflow timeout.
+# After 8 minutes of cumulative 429 waiting this process demotes Gemini to
+# the fallback slot and finishes at Groq speed; the NEXT scheduled run starts
+# with Gemini first again (fresh quota window).
+_GEMINI_WASTE = 0.0       # seconds slept on gemini 429s (this process)
+_GEMINI_DEMOTED = False   # flipped once waste exceeds the budget
+_GEMINI_WASTE_BUDGET = 480.0
+
 
 def _providers() -> list:
-    """Ordered providers: Gemini first (when configured), Groq as fallback."""
-    out = []
+    """Ordered providers: Gemini first (when configured), Groq as fallback —
+    unless the rate-limit breaker has demoted Gemini for this process."""
+    gem = None
     if GEMINI_API_KEY:
-        out.append({
+        gem = {
             "name": "gemini", "base": GEMINI_BASE, "key": GEMINI_API_KEY,
             "preferred": GEMINI_MODELS,
             "patterns": ["gemini-flash-latest", "gemini-3.8-flash",
                          "gemini-3.5-flash", "gemini-flash", "flash", "gemini"],
-        })
+        }
+    groq = None
     if API_KEY:
-        out.append({
-            "name": "groq", "base": BASE, "key": API_KEY,
-            "preferred": PREFERRED_MODELS, "patterns": FALLBACK_PATTERNS,
-        })
+        groq = {"name": "groq", "base": BASE, "key": API_KEY,
+                "preferred": PREFERRED_MODELS, "patterns": FALLBACK_PATTERNS}
+    if gem and groq and _GEMINI_DEMOTED:
+        return [groq, gem]
+    out = []
+    if gem:
+        out.append(gem)
+    if groq:
+        out.append(groq)
     return out
 
 
@@ -318,6 +336,17 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
                     except (TypeError, ValueError):
                         pass
                     last_err = "HTTP 429"
+                    if prov["name"] == "gemini":
+                        global _GEMINI_WASTE, _GEMINI_DEMOTED
+                        _GEMINI_WASTE += wait
+                        if (_GEMINI_WASTE > _GEMINI_WASTE_BUDGET
+                                and not _GEMINI_DEMOTED and len(provs) > 1):
+                            _GEMINI_DEMOTED = True
+                            log.warning(
+                                "gemini demoted to fallback for the rest of "
+                                "this run (%.0fs wasted on 429s) — groq "
+                                "primary now; next scheduled run retries "
+                                "gemini first", _GEMINI_WASTE)
                     log.warning("rate-limited (%s) — sleeping %ds (attempt %d/%d)",
                                 prov["name"], wait, attempt, attempts)
                     time.sleep(min(wait, 45))
