@@ -163,10 +163,17 @@ FALLBACK_PATTERNS = [
 # endpoint — measurably stronger at Persian factual clues — and Groq becomes
 # the automatic fallback. Without a Gemini key the pipeline behaves exactly
 # like the previous Groq-only version.
+# 2026-10-08 (later, live probe on the GH runner): the /models listing returns
+# ids WITH a "models/" prefix (stripped in _provider_ids), and the 2.5/2.0
+# series is deprecated for NEW API keys (HTTP 404 "no longer available to new
+# users"). The -latest aliases are immune to that deprecation, so they come
+# first: gemini-flash-latest / gemini-flash-lite-latest always point at the
+# current generation and keep working across future model rotations.
 GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
-GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
-GEMINI_VALIDATOR = "gemini-2.5-flash-lite"
+GEMINI_MODELS = ["gemini-flash-latest", "gemini-3.8-flash",
+                 "gemini-3.5-flash", "gemini-2.5-flash"]
+GEMINI_VALIDATOR = "gemini-flash-lite-latest"
 VALIDATOR_MODEL = "openai/gpt-oss-120b"
 
 _MODEL_IDS: dict = {}     # provider name -> listed model ids (cache)
@@ -180,8 +187,8 @@ def _providers() -> list:
         out.append({
             "name": "gemini", "base": GEMINI_BASE, "key": GEMINI_API_KEY,
             "preferred": GEMINI_MODELS,
-            "patterns": ["gemini-2.5-flash", "gemini-2.0-flash",
-                         "gemini-flash", "flash", "gemini"],
+            "patterns": ["gemini-flash-latest", "gemini-3.8-flash",
+                         "gemini-3.5-flash", "gemini-flash", "flash", "gemini"],
         })
     if API_KEY:
         out.append({
@@ -201,7 +208,12 @@ def _provider_ids(prov: dict) -> list:
                          headers={"Authorization": f"Bearer {prov['key']}"},
                          timeout=(15, 60))
         if r.status_code == 200:
-            ids = [m.get("id") for m in (r.json().get("data") or []) if m.get("id")]
+            # Gemini's OpenAI-compat listing returns "models/<id>" — strip the
+            # prefix so exact-match picking AND startswith("gemini") routing
+            # both work with bare ids (Groq ids are already bare).
+            ids = [m.get("id", "").removeprefix("models/")
+                   for m in (r.json().get("data") or [])]
+            ids = [i for i in ids if i]
         else:
             log.warning("%s /models HTTP %d — trying preferred list anyway",
                         name, r.status_code)
@@ -252,7 +264,8 @@ def validator_model() -> str | None:
         return None
     prov = provs[0]
     if prov["name"] == "gemini":
-        for cand in (GEMINI_VALIDATOR, "gemini-2.0-flash-lite", "gemini-2.5-flash"):
+        for cand in (GEMINI_VALIDATOR, "gemini-3.5-flash-lite",
+                     "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"):
             if cand in _provider_ids(prov):
                 return cand
         return _pick_model(prov)
@@ -273,7 +286,8 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
     for pi, prov in enumerate(provs):
         mid = None
         if model:
-            ns = "gemini" if model.startswith("gemini") else "groq"
+            ns = ("gemini" if model.startswith(("gemini", "models/gemini"))
+                  else "groq")
             if prov["name"] == ns:
                 mid = model
         if not mid:
@@ -1148,7 +1162,7 @@ def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
     prompt = GEN_PROMPT.format(topic=topic, n=n, avoid=avoid_str)
     for attempt in range(2):
         reply = ask_llm(GEN_SYSTEM, prompt,
-                        max_tokens=2200, temperature=0.8 if attempt else 0.7)
+                        max_tokens=3500, temperature=0.8 if attempt else 0.7)
         items = parse_json_arr(reply or "")
         cands = []
         for it in items:
@@ -1182,7 +1196,7 @@ def validate_pairs(cands: list) -> list:
         return cands
     items = "\n".join(f"- واژه: {w} — شرح: {clue}" for w, clue in cands)
     reply = ask_llm(VALIDATOR_SYSTEM, VALIDATOR_PROMPT.format(items=items),
-                    max_tokens=2200, temperature=0.1, model=validator_model())
+                    max_tokens=3000, temperature=0.1, model=validator_model())
     data = parse_json_arr(reply or "")
     if not data:
         log.warning("  validator unavailable — keeping all candidates")
@@ -1203,7 +1217,7 @@ def editor_pass(puzzle_words: list) -> list:
     """Polish the clues of the placed words (best-effort)."""
     items = "\n".join(f'- {"واژه: " + w["w"] + " — " + "شرح: " + w["clue"]}' for w in puzzle_words)
     reply = ask_llm(EDITOR_SYSTEM, EDITOR_PROMPT.format(items=items),
-                    max_tokens=1600, temperature=0.3)
+                    max_tokens=2400, temperature=0.3)
     data = parse_json_arr(reply or "")
     by_word = {}
     for it in data:
