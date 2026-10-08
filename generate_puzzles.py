@@ -4,14 +4,19 @@
 Daily Persian crossword generator for the "جدولک" Telegram mini app.
 
 Pipeline (per puzzle, 10 per day):
-  1. Groq (qwen) proposes ~26 candidate words + clues for the puzzle's topic,
-     avoiding recently used words.
+  1. The LLM (Gemini when GEMINI_API_KEY is set — stronger at Persian
+     factual clues — else Groq/qwen) proposes ~26 candidate words + clues
+     for the puzzle's topic, avoiding recently used words.
   2. Local filtering: 32-letter alphabet, length 2..8, clue sanity (must not
-     contain the answer word), no repeats within the day, not used before.
+     contain the answer word, no Latin/ASCII), no repeats within the day, not
+     used before — plus the DETERMINISTIC closed-set fact gate: ordinal claims
+     about months / weekdays / seasons / planets are verified against fixed
+     tables and wrong ordinals are auto-corrected (no LLM involved, no escape
+     path).
   3. crossword_builder.build_puzzle() places the words on an 8x8 RTL grid
      ALGORITHMICALLY (zero grid errors by construction) and an independent
      validator re-checks every rule.
-  4. Optional Groq editor pass polishes the clues of the placed words.
+  4. Optional editor pass polishes the clues of the placed words.
   5. The finished day file data/<date>.json is written with lightly
      obfuscated answers (XOR + base64) so casual JSON peeking doesn't spoil
      the puzzles.
@@ -24,7 +29,8 @@ CLI:
     python generate_puzzles.py --date auto            Tehran "tomorrow"
     python generate_puzzles.py --selftest            offline (builtin bank)
 
-Env: GROK_API_KEY (required unless --selftest).
+Env: GEMINI_API_KEY (optional — used first when set) and/or GROK_API_KEY
+(required unless --selftest).
 """
 
 from __future__ import annotations
@@ -61,7 +67,6 @@ CANDIDATES_PER_PUZZLE = 20
 # prompt token count sane — see AVOID_PROMPT_CAP.)
 USED_HISTORY = 3000
 AVOID_PROMPT_CAP = 900   # newest N avoid words actually listed in the prompt
-VALIDATOR_MODEL = "openai/gpt-oss-120b"
 
 TOPICS = [
     "آسمان شب، ستارگان و صورت‌های فلکی",
@@ -94,6 +99,8 @@ GEN_PROMPT = """موضوع واژه‌ها: {topic}
 - شرح باید کوتاه (۲ تا ۱۰ واژه)، شیرین و دقیق باشد و «همان واژه» را توصیف کند؛ شرحِ واژهٔ دیگری ممنوع است.
 - شرح فارسی روان باشد، نه ترجمهٔ تحت‌اللفظی.
 - شرح باید از نظر واقعی درست باشد: رنگ، فصل، اندازه، عدد، جنس، زیستگاه و خواص همه دقیق. مثال غلط: «میوهٔ بهاری سرخ» برای پرتقال — پرتقال نارنجی و زمستانی است.
+- ترتیب‌های ثابت را دقیق رعایت کن: ماه‌ها: فروردین ۱، اردیبهشت ۲، خرداد ۳، تیر ۴، مرداد ۵، شهریور ۶، مهر ۷، آبان ۸، آذر ۹، دی ۱۰، بهمن ۱۱، اسفند ۱۲. روزهای هفتهٔ ایرانی: شنبه ۱، یکشنبه ۲، دوشنبه ۳، سه‌شنبه ۴، چهارشنبه ۵، پنجشنبه ۶، جمعه ۷. فصل‌ها: بهار ۱، تابستان ۲، پاییز ۳، زمستان ۴. سیاره‌ها از خورشید: عطارد ۱، زهره ۲، زمین ۳، مریخ ۴، مشتری ۵، زحل ۶، اورانوس ۷، نپتون ۸. مثال غلط: «ماه دوم خورشیدی» برای خرداد — خرداد ماه سوم است.
+- در شرح فقط حروف فارسی به کار ببر (حرف لاتین و رقم ممنوع).
 - واژه‌های تکراری و نام‌های خاص (شخص/برند/شهر) پیشنهاد نکن.
 
 فقط از این واژه‌ها دوری کن (قبلاً استفاده شده‌اند):
@@ -113,9 +120,10 @@ VALIDATOR_PROMPT = """این جفت‌های «واژه + شرح» برای جد
 هر جفت را جداگانه و سخت‌گیرانه قضاوت کن:
 ۱) آیا واژه یک «واژهٔ واقعی، رایج و مستقل فارسی» است؟ نامعتبر: واژهٔ خارجیِ حرف‌نویسی‌شده (پرشین، فایروال، اسکنر، هاک، فلش، دلفین)، واژهٔ ساختگی/غلط املایی (مربوع، اخر)، شکل وابسته یا اضافه‌دار (ستارهای، پهنای)، حرف اضافه (بالای، زیرِ)، فعل صرف‌شده، واژهٔ کمیابِ منسوخ.
 ۲) آیا شرح دقیقاً «همان واژه» را توصیف می‌کند؟ (مثلاً شرح «حافظهٔ اصلی رایانه» برای واژهٔ «اسلام» یعنی ok=false)
-۳) آیا همهٔ ادعاهای شرح از نظر واقعی درست‌اند؟ (رنگ، فصل، اندازه، عدد، جنس، زیستگاه، خواص) مثلاً «میوهٔ بهاری سرخ» برای «پرتقال» غلط است — پرتقال نارنجی و زمستانی است؛ «جونده» برای «کفتار» غلط است — کفتار گوشت‌خوار است.
+۳) آیا همهٔ ادعاهای شرح از نظر واقعی درست‌اند؟ (رنگ، فصل، اندازه، عدد، جنس، زیستگاه، خواص) مثلاً «میوهٔ بهاری سرخ» برای «پرتقال» غلط است — پرتقال نارنجی و زمستانی است؛ «جونده» برای «کفتار» غلط است — کفتار گوشت‌خوار است. ترتیب‌های ثابت را هم دقیق بسنج: ماه‌ها فروردین ۱ تا اسفند ۱۲ (خرداد ماه سوم است!)، روزهای هفتهٔ ایرانی شنبه ۱ تا جمعه ۷، فصل‌ها بهار ۱ تا زمستان ۴، سیاره‌ها از خورشید عطارد ۱ تا نپتون ۸.
+۴) آیا واژه واقعاً واژه‌ای شناخته‌شدهٔ فارسی است و شرحش معنادار است؟ واژهٔ ساختگی/خیالی (مثل «مشتل»، «شهرمان») یا شرح بی‌معنا (مثل «ماه یک‌شنبه و هفتاد») حتماً ok=false بگیر.
 
-هر جفت که در هر سه معیار واجد شرایط بود ok=true بگیرد وگرنه ok=false.
+هر جفت که در هر چهار معیار واجد شرایط بود ok=true بگیرد وگرنه ok=false.
 پاسخ فقط JSON — برای «همهٔ» جفت‌ها و با همان واژه‌ها:
 [{{"w":"همان واژه","ok":true}} , ...]"""
 
@@ -150,87 +158,168 @@ FALLBACK_PATTERNS = [
     "qwen", "gpt-oss-120b", "gpt-oss", "llama-3.3-70b", "llama-3.1-70b",
     "llama-3.1-8b", "llama", "kimi", "deepseek", "gemma", "moonshot",
 ]
-_MODEL = None
+# Optional second provider (2026-10-08): when GEMINI_API_KEY is set the whole
+# pipeline (generation + validation) prefers Gemini's OpenAI-compatible
+# endpoint — measurably stronger at Persian factual clues — and Groq becomes
+# the automatic fallback. Without a Gemini key the pipeline behaves exactly
+# like the previous Groq-only version.
+GEMINI_API_KEY = (os.environ.get("GEMINI_API_KEY") or "").strip()
+GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+GEMINI_VALIDATOR = "gemini-2.5-flash-lite"
+VALIDATOR_MODEL = "openai/gpt-oss-120b"
+
+_MODEL_IDS: dict = {}     # provider name -> listed model ids (cache)
+_MODELS: dict = {}        # provider name -> chosen primary model id
 
 
-def _headers():
-    return {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+def _providers() -> list:
+    """Ordered providers: Gemini first (when configured), Groq as fallback."""
+    out = []
+    if GEMINI_API_KEY:
+        out.append({
+            "name": "gemini", "base": GEMINI_BASE, "key": GEMINI_API_KEY,
+            "preferred": GEMINI_MODELS,
+            "patterns": ["gemini-2.5-flash", "gemini-2.0-flash",
+                         "gemini-flash", "flash", "gemini"],
+        })
+    if API_KEY:
+        out.append({
+            "name": "groq", "base": BASE, "key": API_KEY,
+            "preferred": PREFERRED_MODELS, "patterns": FALLBACK_PATTERNS,
+        })
+    return out
+
+
+def _provider_ids(prov: dict) -> list:
+    name = prov["name"]
+    if name in _MODEL_IDS:
+        return _MODEL_IDS[name]
+    ids: list[str] = []
+    try:
+        r = requests.get(f"{prov['base']}/models",
+                         headers={"Authorization": f"Bearer {prov['key']}"},
+                         timeout=(15, 60))
+        if r.status_code == 200:
+            ids = [m.get("id") for m in (r.json().get("data") or []) if m.get("id")]
+        else:
+            log.warning("%s /models HTTP %d — trying preferred list anyway",
+                        name, r.status_code)
+    except requests.RequestException as exc:
+        log.warning("%s /models failed: %s", name, exc)
+    _MODEL_IDS[name] = ids
+    return ids
+
+
+def _pick_model(prov: dict) -> str:
+    name = prov["name"]
+    if name in _MODELS:
+        return _MODELS[name]
+    ids = _provider_ids(prov)
+    model = None
+    for m in prov["preferred"]:
+        if m in ids:
+            model = m
+            break
+    if not model and ids:
+        for pat in prov["patterns"]:
+            for mid in ids:
+                if pat in mid:
+                    model = mid
+                    break
+            if model:
+                break
+    if not model:
+        model = prov["preferred"][0]
+    _MODELS[name] = model
+    log.info("LLM provider/model: %s / %s", name, model)
+    return model
 
 
 def detect_model() -> str | None:
-    global _MODEL
-    if _MODEL:
-        return _MODEL
-    if not API_KEY:
+    """Primary provider's model (Gemini when configured, else Groq)."""
+    provs = _providers()
+    if not provs:
         return None
-    ids: list[str] = []
-    try:
-        r = requests.get(f"{BASE}/models", headers=_headers(), timeout=(15, 60))
-        if r.status_code != 200:
-            log.warning("Groq /models HTTP %d — trying preferred list anyway", r.status_code)
-        else:
-            ids = [m.get("id") for m in (r.json().get("data") or []) if m.get("id")]
-    except requests.RequestException as exc:
-        log.warning("Groq /models failed: %s", exc)
-    for m in PREFERRED_MODELS:
-        if m in ids:
-            _MODEL = m
-            log.info("LLM model: %s", m)
-            return m
-    if ids:
-        for pat in FALLBACK_PATTERNS:
-            for mid in ids:
-                if pat in mid:
-                    _MODEL = mid
-                    log.info("LLM model (auto-fallback): %s  (preferred ids unavailable: %s)",
-                             mid, ", ".join(PREFERRED_MODELS))
-                    return mid
-    _MODEL = PREFERRED_MODELS[0]
-    return _MODEL
+    return _pick_model(provs[0])
+
+
+def validator_model() -> str | None:
+    """Validation-lane model for the ACTIVE provider (separate model where
+    possible so it does not compete with the generator's rate limits)."""
+    provs = _providers()
+    if not provs:
+        return None
+    prov = provs[0]
+    if prov["name"] == "gemini":
+        for cand in (GEMINI_VALIDATOR, "gemini-2.0-flash-lite", "gemini-2.5-flash"):
+            if cand in _provider_ids(prov):
+                return cand
+        return _pick_model(prov)
+    return VALIDATOR_MODEL
 
 
 def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float = 0.7,
-             model: str | None = None):
-    """One chat completion with long 429 backoff (qwen: ~1000 tok/min)."""
-    model = model or detect_model()
-    if not model:
+            model: str | None = None):
+    """One chat completion across providers (long 429 backoff on the primary).
+
+    `model` is an explicit model id that belongs to ONE provider (gemini-*,
+    or a Groq id); every other provider falls back to its own primary.
+    None = the primary model of each provider."""
+    provs = _providers()
+    if not provs:
         return None
-    payload = {
-        "model": model,
-        "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": user}],
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-    }
     last_err = None
-    for attempt in range(1, 8):
-        try:
-            r = requests.post(f"{BASE}/chat/completions", headers=_headers(),
-                              json=payload, timeout=(15, 180))
-            if r.status_code == 200:
-                content = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
-                if content and content.strip():
-                    return content.strip()
-                last_err = "empty completion"
-            elif r.status_code == 429:
-                wait = 30
-                try:
-                    wait = max(int(r.headers.get("retry-after") or 0), 20)
-                except (TypeError, ValueError):
-                    pass
-                last_err = "HTTP 429"
-                log.warning("rate-limited — sleeping %ds (attempt %d/7)", wait, attempt)
-                time.sleep(min(wait, 45))
-                continue
-            else:
-                last_err = f"HTTP {r.status_code}: {r.text[:180]}"
-                if r.status_code in (400, 401, 403):
-                    break
-        except requests.RequestException as exc:
-            last_err = str(exc)
-        if attempt < 7:
-            time.sleep(3 * attempt)
-    log.warning("LLM call failed: %s", last_err)
+    for pi, prov in enumerate(provs):
+        mid = None
+        if model:
+            ns = "gemini" if model.startswith("gemini") else "groq"
+            if prov["name"] == ns:
+                mid = model
+        if not mid:
+            mid = _pick_model(prov)
+        headers = {"Authorization": f"Bearer {prov['key']}",
+                   "Content-Type": "application/json"}
+        payload = {
+            "model": mid,
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": user}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        attempts = 7 if pi == 0 else 3
+        for attempt in range(1, attempts + 1):
+            try:
+                r = requests.post(f"{prov['base']}/chat/completions", headers=headers,
+                                  json=payload, timeout=(15, 180))
+                if r.status_code == 200:
+                    content = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
+                    if content and content.strip():
+                        return content.strip()
+                    last_err = "empty completion"
+                elif r.status_code == 429:
+                    wait = 30
+                    try:
+                        wait = max(int(r.headers.get("retry-after") or 0), 20)
+                    except (TypeError, ValueError):
+                        pass
+                    last_err = "HTTP 429"
+                    log.warning("rate-limited (%s) — sleeping %ds (attempt %d/%d)",
+                                prov["name"], wait, attempt, attempts)
+                    time.sleep(min(wait, 45))
+                    continue
+                else:
+                    last_err = f"HTTP {r.status_code}: {r.text[:180]}"
+                    if r.status_code in (400, 401, 403, 404):
+                        break
+            except requests.RequestException as exc:
+                last_err = str(exc)
+            if attempt < attempts:
+                time.sleep(3 * attempt)
+        if pi == 0 and len(provs) > 1:
+            log.warning("primary LLM (%s) failed (%s) — trying fallback provider",
+                        prov["name"], last_err)
+    log.warning("LLM call failed on all providers: %s", last_err)
     return None
 
 
@@ -270,6 +359,9 @@ def parse_json_arr(text: str) -> list:
 # --------------------------------------------------------------------------- #
 
 PERSIAN_RE = re.compile(r"[\u0600-\u06FF]")
+# Latin/ASCII has no business inside a Persian clue (2026-10-08 production
+# bug: «پuls نوسانی انتقال اطلاعات» shipped for «سیگنال»).
+CLUE_ASCII_RE = re.compile(r"[A-Za-z0-9]")
 
 
 def clue_ok(clue: str, word: str) -> bool:
@@ -277,6 +369,8 @@ def clue_ok(clue: str, word: str) -> bool:
     if not (2 <= len(clue) <= 90):
         return False
     if not PERSIAN_RE.search(clue):
+        return False
+    if CLUE_ASCII_RE.search(clue):
         return False
     if normalize_word(word) in normalize_word(clue):
         return False
@@ -342,6 +436,94 @@ def _builtin_index():
     if not _BUILTIN_INDEX:
         _build_builtin_index()
     return _BUILTIN_INDEX
+
+
+# --------------------------------------------------------------------------- #
+#  Closed-set fact gate (2026-10-08 "خرداد ← ماه دوم خورشیدی؟!" fix)             #
+# --------------------------------------------------------------------------- #
+# Both LLM lanes — the generator AND the validator — mislabel ordinal facts
+# about closed sets; production shipped «خرداد» (the THIRD month) with the
+# clue «ماه دوم خورشیدی» on 2026-10-08, and earlier runs swapped weekday
+# ordinals. Ordinal/sequence claims about months, weekdays, seasons and
+# planets are mechanically verifiable, so they are checked against FIXED
+# tables here: a wrong ordinal is AUTO-CORRECTED (deterministic, no LLM, no
+# escape path) and a clue naming a different member of the same closed set
+# without a relational phrase is dropped (it describes the wrong word).
+
+FACT_MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+               "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"]
+FACT_WEEKDAYS = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه",
+                 "پنجشنبه", "جمعه"]
+FACT_SEASONS = ["بهار", "تابستان", "پاییز", "زمستان"]
+FACT_PLANETS = ["عطارد", "زهره", "زمین", "مریخ", "مشتری", "زحل",
+                "اورانوس", "نپتون"]
+_FACT_SETS = [
+    # (members, context keywords that signal a sequence claim, label)
+    (FACT_MONTHS, ("ماه",), "ماه"),
+    (FACT_WEEKDAYS, ("هفته", "روز"), "روز هفته"),
+    (FACT_SEASONS, ("فصل",), "فصل"),
+    (FACT_PLANETS, ("سیاره",), "سیاره"),
+]
+_FACT_ORDINALS = {
+    "نخست": 1, "نخستین": 1, "اول": 1, "اولین": 1, "دوم": 2, "دومین": 2,
+    "سوم": 3, "سومین": 3, "چهارم": 4, "چهارمین": 4, "پنجم": 5,
+    "پنجمین": 5, "ششم": 6, "ششمی": 6, "هفتم": 7, "هشتم": 8, "نهم": 9,
+    "دهم": 10, "یازدهم": 11, "دوازدهم": 12,
+    "واپسین": "last", "آخرین": "last",
+}
+_FACT_ORD_RE = re.compile(
+    "نخستین|نخست|اولین|اول|دومین|دوم|سومین|سوم|چهارمین|چهارم|پنجمین|پنجم|"
+    "ششمی|ششم|هفتم|هشتم|نهم|دهم|یازدهم|دوازدهم|واپسین|آخرین")
+# relational phrases make "another member named in the clue" legitimate
+# («ماه پس از مرداد»، «سیارهٔ همسایهٔ زمین») — never drop those.
+_FACT_RELATIONAL = ("پس از", "پیش از", "قبل", "بعد", "همسایه", "کنار")
+
+
+def _fact_ord_word(n: int, suffix_in: bool = False) -> str:
+    base = {1: "نخست", 2: "دوم", 3: "سوم", 4: "چهارم", 5: "پنجم", 6: "ششم",
+            7: "هفتم", 8: "هشتم", 9: "نهم", 10: "دهم", 11: "یازدهم",
+            12: "دوازدهم"}.get(n, str(n))
+    # preserve the «-ین» adjectival suffix when the wrong ordinal carried it
+    # («سومین سیاره» → «دومین سیاره», not «دوم سیاره»)
+    if suffix_in and base in ("نخست", "دوم", "سوم", "چهارم", "پنجم"):
+        return base + "ین"
+    return base
+
+
+def fact_fix_clue(word: str, clue: str) -> str | None:
+    """Deterministic closed-set fact gate.
+
+    Returns the (possibly corrected) clue, or None when the pair must be
+    dropped. Runs on EVERY path a clue can take — LLM candidates, the builtin
+    bank at import time, reserve adoption, kept-puzzle reload and the final
+    per-puzzle check — so a wrong ordinal can physically no longer ship."""
+    clue = (clue or "").strip()
+    nw = normalize_word(word or "")
+    nc = normalize_word(clue)
+    if not nw or not nc:
+        return clue
+    for members, ctx_kws, _label in _FACT_SETS:
+        norm_members = [normalize_word(m) for m in members]
+        if nw not in norm_members:
+            continue
+        idx = norm_members.index(nw) + 1
+        # (a) the clue names a different member of the same closed set and
+        #     no relational phrase explains it -> it describes another word.
+        if not any(r in nc for r in _FACT_RELATIONAL):
+            for m in norm_members:
+                if m != nw and len(m) >= 3 and m in nc:
+                    return None
+        # (b) an ordinal claim in a sequence context -> must equal idx.
+        if any(k in nc for k in ctx_kws):
+            mo = _FACT_ORD_RE.search(clue)
+            if mo:
+                said = _FACT_ORDINALS[mo.group(0)]
+                said_n = len(norm_members) if said == "last" else said
+                if said_n != idx:
+                    clue = clue.replace(
+                        mo.group(0),
+                        _fact_ord_word(idx, mo.group(0).endswith("ین")), 1)
+    return clue
 
 
 # --------------------------------------------------------------------------- #
@@ -839,9 +1021,9 @@ for _k, _extra in BUILTIN_EXTRA5.items():
 # clean the merged bank: 32-letter alphabet + structural rules
 # (3-8 letters, no function words, no Latin/digits) + (word, clue) swaps
 for k in list(BUILTIN):
-    BUILTIN[k] = [(normalize_word(w), c) for w, c in BUILTIN[k]]
+    BUILTIN[k] = [(normalize_word(w), fact_fix_clue(w, c) or "") for w, c in BUILTIN[k]]
     BUILTIN[k] = [(w, c) for w, c in BUILTIN[k]
-                  if word_ok(w) and word_structural_ok(w) and pair_plausible(w, c)]
+                  if c and word_ok(w) and word_structural_ok(w) and pair_plausible(w, c)]
 
 
 
@@ -886,8 +1068,13 @@ def load_kept_puzzles(date: str, keep_first: int) -> list:
                 return []          # undecodable — do not keep anything
             if not word or not word_ok(word):
                 return []
+            clue = fact_fix_clue(word, w["clue"])
+            if clue is None:
+                log.warning("kept clue of «%s» failed the fact gate — dropping keep",
+                            word)
+                return []
             words.append({"w": word, "r": w["r"], "c": w["c"], "d": w["d"],
-                          "clue": w["clue"]})
+                          "clue": clue})
         ok, errs = validate_puzzle(words)
         if not ok:
             log.warning("kept puzzle %s failed validation — dropping keep", p.get("n"))
@@ -969,7 +1156,8 @@ def generate_candidates(topic: str, avoid: list, n: int, rng) -> list:
                 continue
             w = normalize_word(str(it.get("w") or it.get("word") or ""))
             clue = str(it.get("clue") or it.get("definition") or "").strip()
-            if pair_plausible(w, clue):
+            clue = fact_fix_clue(w, clue)
+            if clue is not None and pair_plausible(w, clue):
                 cands.append((w, clue))
         if len(cands) >= 12:
             cands = validate_pairs(cands)
@@ -994,7 +1182,7 @@ def validate_pairs(cands: list) -> list:
         return cands
     items = "\n".join(f"- واژه: {w} — شرح: {clue}" for w, clue in cands)
     reply = ask_llm(VALIDATOR_SYSTEM, VALIDATOR_PROMPT.format(items=items),
-                    max_tokens=2200, temperature=0.1, model=VALIDATOR_MODEL)
+                    max_tokens=2200, temperature=0.1, model=validator_model())
     data = parse_json_arr(reply or "")
     if not data:
         log.warning("  validator unavailable — keeping all candidates")
@@ -1088,6 +1276,15 @@ def build_one_puzzle(idx: int, topic: str, avoid: set, used_today: set,
     if not ok:
         log.warning("  puzzle %d invalid: %s", idx + 1, errs)
         return None
+    # final deterministic fact gate on every shipped clue (belt and braces —
+    # all entry paths already sanitize; this makes bypassing impossible)
+    for w in words:
+        fixed = fact_fix_clue(w["w"], w["clue"])
+        if fixed is None:
+            log.warning("  puzzle %d: clue of «%s» failed the fact gate — rebuild",
+                        idx + 1, w["w"])
+            return None
+        w["clue"] = fixed
     # NOTE: the editor pass is intentionally disabled — the validator on a
     # separate model is the quality gate, and skipping the editor keeps the
     # pipeline inside Groq's tight free-tier rate limits.
@@ -1153,6 +1350,16 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
                 continue
             words = p.get("words") or []
             if not words or not all(w.get("clue") for w in words):
+                continue
+            # sanitize reserve clues with the deterministic fact gate
+            for w in words:
+                fixed = fact_fix_clue(w.get("w", ""), w.get("clue", ""))
+                if fixed is None:
+                    words = []
+                    break
+                w["clue"] = fixed
+            if not words:
+                log.info("  reserve puzzle rejected by fact gate — skipping")
                 continue
             wset = {w["w"] for w in words}
             if (used_today & wset) or (used_words & wset):
@@ -1225,6 +1432,15 @@ def top_up_reserve(date: str, use_llm: bool = True) -> list:
     for p in reserve.get("puzzles", []):
         words = p.get("words") or []
         if not words or not all(w.get("clue") for w in words):
+            continue
+        for w in words:
+            fixed = fact_fix_clue(w.get("w", ""), w.get("clue", ""))
+            if fixed is None:
+                words = []
+                break
+            w["clue"] = fixed
+        if not words:
+            log.info("  dropping stale reserve puzzle (fact gate)")
             continue
         wset = {w["w"] for w in words}
         if wset & avoid:
@@ -1314,8 +1530,8 @@ def main() -> int:
         logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s", "%H:%M:%S"))
 
     use_llm = not args.selftest
-    if use_llm and not API_KEY:
-        log.error("GROK_API_KEY is not set")
+    if use_llm and not (API_KEY or GEMINI_API_KEY):
+        log.error("neither GEMINI_API_KEY nor GROK_API_KEY is set")
         return 2
     if use_llm and not detect_model():
         log.error("no LLM available")
