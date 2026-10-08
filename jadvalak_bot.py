@@ -3,19 +3,23 @@
 """
 جدولک gateway bot — runs 24/7 on GitHub Actions (self-chaining 6h jobs).
 
-Responsibilities:
-  - /start and the app deep-link (?start=gate): check that the user is a
-    REAL member of the @daily_sciences channel (via getChatMember) before
-    handing out the mini-app button. The check runs on EVERY button issue,
-    so a user who leaves the channel must rejoin to get back in.
-  - The mini-app button URL carries a signed, expiring access token
-    (?st=uid.exp.sig) that the app validates (uid bound to initData,
-    expiry, format) PLUS a cache-busting version param (&v=...) so
-    Telegram's WebView always fetches fresh HTML. TTL default: 365 days —
-    the app also keeps the token in localStorage and a returning-player
-    flag, so members enter the game directly on every open; the gate page
-    only appears for first-time visitors.
-  - "I joined" inline button: re-checks membership instantly.
+Architecture (2026-10-08 v3 — "verification lives in the bot chat"):
+  - The mini app itself NEVER gates: it opens straight into the game. There
+    is no join screen, no token dance and no second window inside the app —
+    which is exactly what caused the recurring «صفحهٔ مزاحم» complaints.
+  - Membership is verified HERE, in the bot chat, BEFORE the mini app ever
+    opens: on /start (or any message) and on the «عضو شدم» callback we run
+    getChatMember against @daily_sciences. Verified members receive the
+    «ورود به جدولک» web_app button (and get it pinned for easy return);
+    non-members receive the join flow. The check re-runs on EVERY button
+    issue, so a user who leaves the channel must rejoin to get back in.
+  - The old web_app chat-menu button is actively RESET to the standard
+    commands menu: a frozen menu-button URL could outlive channel
+    membership and bypass the chat verification.
+  - Button URLs still carry a signed ?st= token + &v=<deploy>: the v param
+    busts Telegram's WebView HTML cache (guaranteed fresh code), and the st
+    token keeps WebView-cached OLDER app builds (which still validate it)
+    from ever showing their legacy gate to members clicking fresh buttons.
   - /about: "طراحی، ساخت و اجرا توسط @factcaster"
   - Membership checks use a list of bot tokens (any bot that is an admin of
     the channel works — e.g. the channel's posting bot), so the gate works
@@ -59,8 +63,8 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.08.1"   # deploy version — keep in sync with index.html APP_V and version.json
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: members re-enter directly for a whole year; the mini app ALSO keeps a returning-player flag (localStorage + CloudStorage), so even an expired token never re-shows the gate to someone who has played before
+APP_V = "2026.10.08.2"   # deploy version — keep in sync with index.html APP_V and version.json
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 
@@ -120,6 +124,7 @@ def welcome_text() -> str:
 _member_cache: dict = {}          # user_id -> (allowed, ts)
 _checker_idx: int = 0             # which checker token works
 _gate_broken_notified: set = set()
+_pinned_chats: set = set()        # chats whose game-button message we pinned
 
 # ---- stats state ----
 _seen_users: set = set()          # salted hashes of counted player ids
@@ -341,21 +346,48 @@ def app_url_for(user_id: int) -> str:
     return f"{APP_URL}{sep}st={make_access_token(user_id)}&v={APP_V}"
 
 
-def set_menu_button(chat_id: int, user_id: int) -> None:
-    """Refresh this chat's «جدولک» menu button with a fresh signed URL so
-    verified members open the game DIRECTLY (no gate) every time, even if
-    the mini app's localStorage was cleared. Best-effort: failures are
-    logged and ignored."""
-    if not APP_URL:
-        return
+def set_menu_button(chat_id: int) -> None:
+    """RESET this chat's menu button to the standard COMMANDS menu.
+    Older builds installed a web_app «جدولک» menu button whose URL is frozen
+    — it can outlive channel membership and bypass the chat verification.
+    The game now opens ONLY through the verified buttons in the chat flow,
+    exactly as the owner asked: membership + verification happen here in
+    the bot chat, and only then does the mini app open. Best-effort."""
     try:
         tg("setChatMenuButton", BOT_TOKEN, {
             "chat_id": chat_id,
-            "menu_button": {"type": "web_app", "text": "جدولک",
-                            "web_app": {"url": app_url_for(user_id)}},
+            "menu_button": {"type": "commands"},
         })
     except Exception as exc:
-        log.warning("setChatMenuButton failed: %s", exc)
+        log.warning("setChatMenuButton reset failed: %s", exc)
+
+
+def set_commands() -> None:
+    """Fill the standard commands menu (shown by the commands menu button)
+    with Persian descriptions — a useful, non-bypassing menu."""
+    tg("setMyCommands", BOT_TOKEN, {"commands": [
+        {"command": "start", "description": "شروع بازی جدولک 🧩"},
+        {"command": "about", "description": "درباره جدولک"},
+        {"command": "help", "description": "راهنمای بازی"},
+    ]})
+
+
+def pin_message(chat_id: int, message_id: int | None) -> None:
+    """Pin the game-button message (best-effort, once per chat per run) so
+    returning players always have a one-tap entry pinned at the top of the
+    bot chat. Private chats allow bots to pin without extra rights."""
+    if not message_id or chat_id in _pinned_chats:
+        return
+    try:
+        ok = tg("pinChatMessage", BOT_TOKEN, {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "disable_notification": True,
+        })
+        if ok is not None:
+            _pinned_chats.add(chat_id)
+    except Exception as exc:
+        log.warning("pinChatMessage failed: %s", exc)
 
 
 def verify_access_token(token: str, user_id: int | None) -> bool:
@@ -406,6 +438,7 @@ def kb_app(user_id: int) -> dict:
 def handle_start(chat_id: int, user_id: int, first: bool):
     count_user(user_id)
     member = is_member(user_id)
+    set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member is None:
         # no checker bot has channel access — fail CLOSED with an explanation
         log.error("membership check unavailable for user %s", user_id)
@@ -415,8 +448,9 @@ def handle_start(chat_id: int, user_id: int, first: bool):
         ))
         return
     if member:
-        set_menu_button(chat_id, user_id)
-        send(chat_id, welcome_text() if first else "بیا داخل! 🎮", kb_app(user_id))
+        # verified HERE in the chat — only now does the mini app open
+        mid = send(chat_id, welcome_text() if first else "بیا داخل! 🎮", kb_app(user_id))
+        pin_message(chat_id, mid)
     else:
         send(chat_id, GATE_TEXT, kb_join())
 
@@ -427,13 +461,15 @@ def handle_joined(cb) -> None:
     message_id = cb["message"]["message_id"]
     count_user(user_id)
     member = is_member(user_id)
+    set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member is None:
         answer_cb(cb["id"], "بررسی عضویت موفق نبود؛ چند لحظه بعد دوباره بزن.")
         return
     if member:
-        set_menu_button(chat_id, user_id)
+        # verified HERE in the chat — only now does the mini app open
         answer_cb(cb["id"], "✅ خوش اومدی! دکمهٔ «ورود به جدولک» تازه شد.")
         edit_message(chat_id, message_id, welcome_text(), kb_app(user_id))
+        pin_message(chat_id, message_id)
     else:
         answer_cb(cb["id"], "هنوز عضویتت تایید نشد! اول عضو @daily_sciences شو.")
         # edit the same message (no spam) with a fresh nudge + join keyboard
@@ -543,6 +579,8 @@ def main() -> int:
     else:
         log.error("getMe failed — token invalid?")
         return 2
+
+    set_commands()   # standard commands menu (replaces legacy web_app menu)
 
     offset = START_OFFSET
     deadline = time.time() + RUNTIME_MINUTES * 60
