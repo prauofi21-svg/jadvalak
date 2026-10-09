@@ -32,13 +32,15 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
   --radius:14px;
 }
 
-/* ================= theme palette (2026 neon-glass redesign) =================
+/* ================= theme palette (2026 neon-glass redesign, v2.1) =================
    One coherent futuristic identity, applied to every puzzle:
    deep navy near-black canvas + subtle gradients + drifting neon particles;
    accent light in bright blue / electric blue / violet with LIMITED pink
-   highlights; ivory-champagne glass clue panel with neon blue lines;
-   recessed dark-glass empty cells, teal glass filled tiles, animated blue
-   selection ring; glass round keyboard keys with blue/violet edge light. */
+   highlights; ivory-champagne glass clue panel with neon blue light-line;
+   recessed dark-glass empty cells; typed letters = electric-BLUE glass,
+   wrong letters (filled word) = rose-red glass, locked/solved = teal-green
+   glass only; animated blue selection ring; glass round keyboard keys with
+   blue/violet edge light. Green is NEVER shown for an unverified letter. */
 :root{
   --bg1:#060a18;--bg2:#0a1230;
   --panel:#0d1730f2;--panel-bd:#4668b880;--ink:#edf3ff;--sub:#93a9dd;
@@ -88,19 +90,21 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 /* ---- slim app header: glowing geometric logo + جدولک wordmark ---- */
 .apphead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;padding:1px 2px}
 .brand{display:flex;align-items:center;gap:9px;min-width:0}
-.logo-mark{flex:0 0 auto;display:grid;grid-template-columns:10px 10px;grid-template-rows:10px 10px;gap:2.5px;padding:3.5px;border-radius:8px;background:linear-gradient(135deg,#13234ad9,#0a1428d9);border:1px solid #3d6db880;box-shadow:0 0 12px #45c8ff3d,inset 0 0 7px #45c8ff1f}
+.logo-mark{flex:0 0 auto;display:grid;grid-template-columns:10px 10px;grid-template-rows:10px 10px;gap:2.5px;padding:3.5px;border-radius:8px;background:linear-gradient(135deg,#13234ad9,#0a1428d9);border:1px solid #3d6db880;box-shadow:0 0 16px #45c8ff59,inset 0 0 9px #45c8ff2e}
 .logo-mark i{display:block;border-radius:2.5px}
 .logo-mark i:nth-child(1){background:linear-gradient(135deg,#4cc9f0,#2563eb);box-shadow:0 0 6px #4cc9f0a8}
 .logo-mark i:nth-child(2){background:linear-gradient(135deg,#8b5cf6,#6366f1);box-shadow:0 0 6px #8b5cf6a8}
 .logo-mark i:nth-child(3){background:linear-gradient(135deg,#f472b6,#8b5cf6);box-shadow:0 0 6px #f472b68c}
 .logo-mark i:nth-child(4){background:linear-gradient(135deg,#38bdf8,#22d3ee);box-shadow:0 0 6px #38bdf8a8}
-.brand-title{font-size:1.18rem;font-weight:900;color:#f2f7ff;line-height:1.08;text-shadow:0 0 16px #4cc9ff59}
+.brand-title{font-size:1.18rem;font-weight:900;color:#f2f7ff;line-height:1.08;text-shadow:0 0 10px #4cc9ff8c,0 0 28px #3b82f673}
 .brand-sub{font-size:.55rem;letter-spacing:.34em;color:#7f9cd8;font-weight:700;direction:ltr;text-shadow:0 0 8px #45c8ff33;line-height:1.1}
 
 /* ---- clue banner: ivory-champagne glass panel with neon blue lines ---- */
-.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#f9f3e2 0%,#efe5cb 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;box-shadow:0 0 16px -3px #45c8ff73,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59;transition:box-shadow .3s}
-.clue-banner.shake{box-shadow:0 0 16px -3px #f472b6a8,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6}
-.clue-tag{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:linear-gradient(165deg,#1273d6 0%,#219ee8 100%);color:var(--tag-ink);font-weight:900;font-size:.95rem;padding:5px 12px;border-radius:12px;white-space:nowrap;box-shadow:0 0 12px #38bdf880,inset 0 1px 0 #ffffff55,inset 0 -2px 0 #0c5aa455;text-shadow:0 1px 1px #0a3f6699}
+.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#f9f3e2 0%,#efe5cb 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;position:relative;box-shadow:0 0 22px -3px #45c8ff96,0 0 42px -10px #45c8ff54,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59,inset 0 0 16px #ffffff3d;transition:box-shadow .3s}
+/* neon light-line under the panel's top edge — pure CSS glow accent */
+.clue-banner::before{content:"";position:absolute;left:12px;right:12px;top:3px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent 0%,#5bc8ffd9 16%,#7cc4ffeb 50%,#8b5cf6cc 84%,transparent 100%);box-shadow:0 0 10px #45c8ffb3,0 0 20px #45c8ff59;pointer-events:none}
+.clue-banner.shake{box-shadow:0 0 22px -3px #f472b6b3,0 0 42px -10px #f472b666,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 16px #ffffff3d}
+.clue-tag{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:linear-gradient(165deg,#1273d6 0%,#219ee8 100%);color:var(--tag-ink);font-weight:900;font-size:.95rem;padding:5px 12px;border-radius:12px;white-space:nowrap;box-shadow:0 0 16px #38bdf8b3,0 0 32px #219ee859,inset 0 1px 0 #ffffff55,inset 0 -2px 0 #0c5aa455;text-shadow:0 1px 1px #0a3f6699}
 .clue-tag .dir-ic{width:17px;height:9px;flex:0 0 auto;filter:drop-shadow(0 1px 1px #0a3f6666)}
 .clue-tag .dir-ic path{stroke:currentColor}
 .clue-text{flex:1;min-width:0;font-size:18px;font-weight:800;line-height:1.55;color:var(--banner-ink);word-break:break-word;max-height:56px;overflow-y:auto;overflow-x:hidden}
@@ -113,12 +117,12 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 .status-row{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:30px;padding:0 2px}
 .menu-btn{width:32px;height:32px;border-radius:10px;background:linear-gradient(180deg,#16294fd9,#0e1c3cd9);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1rem;font-weight:800;color:var(--ink);box-shadow:inset 0 1px 0 #ffffff17,0 0 10px #45c8ff26;transition:transform .15s}
 .menu-btn:active{transform:scale(.88)}
-.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 0 10px #45c8ff2e}
+.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 0 12px #45c8ff47}
 .dots{flex:1;display:flex;gap:4px;justify-content:flex-start;overflow:hidden}
 .dot{width:8px;height:8px;border-radius:50%;background:#0d1c3e;border:1px solid #3d6db880;box-shadow:inset 0 1px 2px #0009;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
-.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px #45c8ff66,0 0 9px #45c8ff8c;animation:dotPulse 2.6s ease-in-out infinite}
-@keyframes dotPulse{50%{box-shadow:0 0 0 4px #45c8ff3d,0 0 13px #45c8ffb3}}
-.dot.done{background:linear-gradient(180deg,#4cc9f0,#2563eb);border-color:#7dd3fc;box-shadow:0 0 8px #45c8ff8c}
+.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px #45c8ff66,0 0 12px #45c8ffb3;animation:dotPulse 2.6s ease-in-out infinite}
+@keyframes dotPulse{50%{box-shadow:0 0 0 4px #45c8ff4d,0 0 16px #45c8ffd9}}
+.dot.done{background:linear-gradient(180deg,#4cc9f0,#2563eb);border-color:#7dd3fc;box-shadow:0 0 11px #45c8ffb3}
 .dot.lock{opacity:.35;cursor:default}
 .dot.just-unlocked{animation:dotUnlock .7s cubic-bezier(.34,1.56,.64,1)}
 @keyframes dotUnlock{40%{transform:scale(2)}}
@@ -126,34 +130,46 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 /* ---- player count chip (lives in the header) ---- */
 .pcount{flex:0 0 auto;font-size:.72rem;font-weight:800;color:#bcd0f5;white-space:nowrap;padding:3px 10px;background:linear-gradient(180deg,#13234acc,#0d1c3ecc);border:1px solid #3d6db873;border-radius:999px;line-height:1.25;box-shadow:inset 0 1px 0 #ffffff14,0 0 10px #45c8ff1f;opacity:0;animation:appIn .5s ease .3s forwards}
 
-/* ---- grid: the visual focal point (soft blue halo behind, zero layout cost) ---- */
-.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden;position:relative}
-.grid-zone::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,470px);aspect-ratio:1/1;background:radial-gradient(50% 50% at 50% 50%,#2f6db933 0%,#8b5cf61c 45%,transparent 72%);pointer-events:none}
+/* ---- grid: the visual focal point (soft blue halo behind, zero layout cost) ----
+   "safe center": if the grid ever overflows the zone, it anchors to the TOP
+   (bottom clips first) instead of clipping both edges — the top row can
+   never disappear under the status bar. Older engines ignore the unsafe
+   value and keep the plain center above. */
+.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden;position:relative;align-content:safe center;justify-content:safe center}
+.grid-zone::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,470px);aspect-ratio:1/1;background:radial-gradient(50% 50% at 50% 50%,#2f6db94d 0%,#8b5cf62b 45%,transparent 72%);pointer-events:none;animation:haloPulse 7s ease-in-out infinite alternate}
+@keyframes haloPulse{from{opacity:.68}to{opacity:1}}
 .grid-wrap{display:grid;grid-template-columns:repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px;position:relative}
 /* classic crossword corner number — small chip at the top-right of each word's START cell */
-.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:#0a1428e6;font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:#7fd4ff;pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2;text-shadow:0 0 6px #45c8ff8c}
+.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:#0a1428e6;font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:#7fd4ff;pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2;text-shadow:0 0 8px #45c8ffb3}
 .num.on{color:#ffffff;background:linear-gradient(165deg,#1273d6,#219ee8);font-weight:900;transform:scale(1.18);box-shadow:0 0 10px #38bdf8b3}
 /* empty cells = dark glass tiles, slightly recessed, glowing edges */
-.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,#101d3af2 0%,#0a1428f2 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 #4cc9f01f,0 0 6px #2f6db930;transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
+.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,#101d3af2 0%,#0a1428f2 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 #4cc9f01f,0 0 8px #2f6db93d;transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
 /* blocked cells = matte grey-blue blocks, NO glow — clearly different from the glowing sockets */
 .cell.void{background:#1a2542;border-color:#26325acc;box-shadow:inset 0 1px 3px #00000080;cursor:default}
 /* active word = electric-blue wash over the dark glass */
 .cell.hl{background:linear-gradient(180deg,#153a6bf5 0%,#0d1f42f5 100%);border-color:#4cc9f0cc;box-shadow:inset 0 2px 6px #0009,0 0 8px #45c8ff45}
 /* selected cell = animated bright blue ring + soft glow */
-.cell.cur{background:linear-gradient(180deg,#1a4a80f8 0%,#10294ef8 100%);border-color:#45c8ff;box-shadow:inset 0 2px 6px #0009,0 0 12px #45c8ff8f}
-.cell.cur::after{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid #45c8ff;box-shadow:0 0 12px #45c8ffb3,inset 0 0 8px #45c8ff55;animation:curGlow 1.6s ease-in-out infinite;pointer-events:none;z-index:3}
+.cell.cur{background:linear-gradient(180deg,#1a4a80f8 0%,#10294ef8 100%);border-color:#45c8ff;box-shadow:inset 0 2px 6px #0009,0 0 18px #45c8ffb3}
+.cell.cur::after{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid #45c8ff;box-shadow:0 0 16px #45c8ffd9,0 0 32px #45c8ff73,inset 0 0 10px #45c8ff66;animation:curGlow 1.6s ease-in-out infinite;pointer-events:none;z-index:3}
 @keyframes curGlow{50%{opacity:.42}}
 .cell.origin::before{content:"";position:absolute;top:2px;right:2px;width:0;height:0;border-top:7px solid var(--hl-cur);border-left:7px solid transparent;opacity:.9;pointer-events:none;z-index:2}
-/* filled letter = teal glass tile with real depth, sitting inside the socket */
-.cell .lt{position:absolute;inset:2px;display:grid;place-items:center;border-radius:5px;background:linear-gradient(180deg,#17bdb0 0%,#0b8a80 100%);box-shadow:inset 0 1px 0 #ffffff4d,inset 0 -3px 5px #06554e99,0 2px 6px -1px #0c8f8466,0 0 10px #14b8a638;color:#f4fffd;text-shadow:0 1px 2px #00332ecc;pointer-events:none}
+/* typed letter = ELECTRIC-BLUE glass tile (NOT green — green is reserved
+   for letters proven correct when a word locks; blue = unverified guess) */
+.cell .lt{position:absolute;inset:2px;display:grid;place-items:center;border-radius:5px;background:linear-gradient(180deg,#37a4f5 0%,#1d63d8 100%);box-shadow:inset 0 1px 0 #ffffff4d,inset 0 -3px 5px #0a2a6e99,0 2px 6px -1px #1d63d866,0 0 12px #45c8ff4d;color:#f4faff;text-shadow:0 1px 2px #062042cc;pointer-events:none}
 .cell .lt:empty{display:none}
-/* solved = richer teal-green glass + neon success edge */
-.cell.locked{background:linear-gradient(180deg,#0f3a36f2 0%,#0a2622f2 100%);border-color:#2dd4bf99;box-shadow:inset 0 2px 6px #000a,0 0 9px #2dd4bf47}
-.cell.locked .lt{background:linear-gradient(180deg,#2fe0c0 0%,#14b8a6 55%,#0d9488 100%);box-shadow:inset 0 1px 0 #ffffff5c,inset 0 -3px 5px #06554e99,0 0 13px #2dd4bf70}
+/* wrong letter (word completely filled and incorrect) = rose-red neon glass
+   so it is unmistakable WHICH cells must be fixed — never green */
+.cell .lt.err{background:linear-gradient(180deg,#f7587f 0%,#c02655 100%);box-shadow:inset 0 1px 0 #ffffff4d,inset 0 -3px 5px #6e0a2a99,0 2px 6px -1px #c0265566,0 0 14px #f43f5e66;color:#fff2f6;text-shadow:0 1px 2px #5e0a22cc;animation:errIn .28s cubic-bezier(.34,1.56,.64,1)}
+@keyframes errIn{from{opacity:.35;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
+/* solved = richer teal-green glass + neon success edge (green ONLY here) */
+.cell.locked{background:linear-gradient(180deg,#0f3a36f2 0%,#0a2622f2 100%);border-color:#2dd4bf99;box-shadow:inset 0 2px 6px #000a,0 0 12px #2dd4bf5c}
+.cell.locked .lt{background:linear-gradient(180deg,#2fe0c0 0%,#14b8a6 55%,#0d9488 100%);box-shadow:inset 0 1px 0 #ffffff5c,inset 0 -3px 5px #06554e99,0 0 16px #2dd4bf8c,0 0 30px #14b8a647}
 .cell span{pointer-events:none;animation:letterIn .16s cubic-bezier(.2,.8,.3,1.4)}
 @keyframes letterIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
 .cell.pop{animation:cellPop .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes cellPop{50%{transform:scale(1.13)}}
+.cell.errshake{animation:cellErr .34s ease}
+@keyframes cellErr{20%{transform:translateX(4px)}40%{transform:translateX(-4px)}60%{transform:translateX(3px)}80%{transform:translateX(-2px)}}
 .cell.flip{animation:flipIn .5s ease both}
 @keyframes flipIn{0%{transform:rotateX(0)}45%{transform:rotateX(88deg)}55%{transform:rotateX(-88deg)}100%{transform:rotateX(0)}}
 .grid-wrap.entrance .cell{animation:cellIn .4s both cubic-bezier(.2,.8,.3,1)}
@@ -163,9 +179,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes sweep{from{transform:translateX(120%)}to{transform:translateX(-120%)}}
 
 /* ---- word progress (below the grid) ---- */
-.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:#9db4e8;min-height:18px}
+.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:#9db4e8;min-height:18px;text-shadow:0 0 8px #45c8ff33}
 .wbar{flex:1;height:6px;border-radius:99px;background:#0d1c3e;border:1px solid #3d6db866;overflow:hidden;box-shadow:inset 0 1px 3px #0008}
-.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#2563eb,#4cc9f0 45%,#8b5cf6);box-shadow:0 0 8px #4cc9f066;transition:width .5s cubic-bezier(.2,.8,.3,1)}
+.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#2563eb,#4cc9f0 45%,#8b5cf6);box-shadow:0 0 10px #4cc9f099,0 0 20px #2563eb59;transition:width .5s cubic-bezier(.2,.8,.3,1)}
 
 /* ---- keyboard — the user's STANDARD layout, unchanged (2026-10-08 v3):
    LEFT-TO-RIGHT 3-row 11 + 11 + 10 letters + wide ⌫ at the FAR RIGHT of the
@@ -177,10 +193,10 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
    light and chic pressed states (letters/order/⌫ position untouched). ---- */
 .kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 0;direction:ltr}
 .krow{display:flex;gap:5px;justify-content:center}
-.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,#1b2c55f2 0%,#131f40f2 100%);border:1px solid #4668b89e;border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 9px #45c8ff24;transition:transform .09s,filter .09s,box-shadow .09s;cursor:pointer}
+.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,#1b2c55f2 0%,#131f40f2 100%);border:1px solid #4668b89e;border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px #45c8ff36;transition:transform .09s,filter .09s,box-shadow .09s;cursor:pointer}
 /* middle row gets the violet edge light (subtle blue/violet alternation) */
-.krow:nth-child(2) .key{border-color:#6d5fc09e;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 9px #8b5cf62b}
-.key:active,.key.pressed{transform:scale(.9);filter:brightness(1.28);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 15px #45c8ff7d,0 0 5px #8b5cf64d}
+.krow:nth-child(2) .key{border-color:#6d5fc09e;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px #8b5cf63d}
+.key:active,.key.pressed{transform:scale(.9);filter:brightness(1.28);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 18px #45c8ffa3,0 0 7px #8b5cf666}
 .key::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid #45c8ff;opacity:0;transform:scale(.82);pointer-events:none}
 .key.pressed::after{animation:halo .34s ease-out}
 @keyframes halo{from{opacity:.75;transform:scale(.82)}to{opacity:0;transform:scale(1.12)}}
@@ -188,8 +204,8 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
    keyboard's LTR direction: the ⌫ is the FIRST key from the right in the
    user's standard layout (ردیف سوم: ضربدر، چ و پ د ذ ر ز ژ ط ظ).
    Visually DISTINCT: violet→pink neon glass so it is instantly recognizable. */
-.key.bk{max-width:86px;background:linear-gradient(180deg,#3a2560f2 0%,#241547f2 100%);border-color:#c084fc80;box-shadow:inset 0 1px 0 #ffffff22,inset 0 -3px 6px #00000080,0 0 13px #a855f75c,0 0 5px #ec48994a;color:#fbeaff}
-.key.bk:active,.key.bk.pressed{transform:scale(.9);filter:brightness(1.3);box-shadow:inset 0 1px 0 #ffffff30,inset 0 -2px 4px #0006,0 0 18px #e879f9a3,0 0 6px #ec48997a}
+.key.bk{max-width:86px;background:linear-gradient(180deg,#3a2560f2 0%,#241547f2 100%);border-color:#c084fc80;box-shadow:inset 0 1px 0 #ffffff22,inset 0 -3px 6px #00000080,0 0 16px #a855f77a,0 0 6px #ec489966;color:#fbeaff}
+.key.bk:active,.key.bk.pressed{transform:scale(.9);filter:brightness(1.3);box-shadow:inset 0 1px 0 #ffffff30,inset 0 -2px 4px #0006,0 0 22px #e879f9c0,0 0 8px #ec489996}
 .key.bk::after{border-color:#e879f9}
 .key.bk svg{width:58%;height:58%;max-width:30px;max-height:30px;fill:currentColor}
 
@@ -210,7 +226,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes logoFloat{50%{transform:translateY(-9px) rotate(-4deg)}}
 .screen h2{font-size:1.5rem;font-weight:800}
 .screen p{font-size:.95rem;line-height:1.9;color:var(--sub);font-weight:600;max-width:330px}
-.btn{background:linear-gradient(165deg,#2ea3f0 0%,#1f7fe0 100%);color:#ffffff;font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 0 16px -2px #45c8ff8c,0 6px 16px -6px #0008,inset 0 1px 0 #ffffff4d;text-shadow:0 1px 1px #0a3f6680;transition:transform .15s,filter .15s;min-width:240px}
+.btn{background:linear-gradient(165deg,#2ea3f0 0%,#1f7fe0 100%);color:#ffffff;font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 0 20px -2px #45c8ffb3,0 0 42px -8px #45c8ff66,0 6px 16px -6px #0008,inset 0 1px 0 #ffffff4d;text-shadow:0 1px 1px #0a3f6680;transition:transform .15s,filter .15s;min-width:240px}
 .btn:active{transform:scale(.95)}
 .btn.ghost{background:linear-gradient(180deg,#16294fd9,#0e1c3cd9);color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:inset 0 1px 0 #ffffff17,0 0 12px #45c8ff2b;text-shadow:none}
 .btn.busy{pointer-events:none;filter:saturate(.6) brightness(.9)}
@@ -222,7 +238,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 #sheet[hidden]{display:none}
 #sheet .scrim{position:absolute;inset:0;background:#00000073;animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0}}
-#sheet .card{position:relative;width:min(430px,100%);background:linear-gradient(180deg,#101d3af7 0%,#0b1530f7 100%);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px -8px #000c,0 0 22px -6px #45c8ff40;animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
+#sheet .card{position:relative;width:min(430px,100%);background:linear-gradient(180deg,#101d3af7 0%,#0b1530f7 100%);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px -8px #000c,0 0 26px -6px #45c8ff5c;animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
 @keyframes sheetUp{from{transform:translateY(60%);opacity:.4}}
 #sheet .grab{width:44px;height:5px;border-radius:9px;background:var(--panel-bd);margin:0 auto 12px}
 #sheet h3{font-size:1.05rem;font-weight:800;margin-bottom:10px}
@@ -240,7 +256,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 /* ================= win overlay + confetti ================= */
 #win{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#000000a6}
 #win[hidden]{display:none}
-#win .card{width:min(360px,88vw);background:linear-gradient(180deg,#101d3af9 0%,#0b1530f9 100%);border:1.5px solid #4cc9f080;border-radius:24px;padding:30px 24px;text-align:center;box-shadow:0 0 30px -6px #45c8ff73,0 20px 50px -12px #000d,inset 0 1px 0 #ffffff1f;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
+#win .card{width:min(360px,88vw);background:linear-gradient(180deg,#101d3af9 0%,#0b1530f9 100%);border:1.5px solid #4cc9f080;border-radius:24px;padding:30px 24px;text-align:center;box-shadow:0 0 34px -6px #45c8ff99,0 0 60px -12px #45c8ff54,0 20px 50px -12px #000d,inset 0 1px 0 #ffffff1f;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
 @keyframes winIn{from{transform:scale(.55) translateY(30px);opacity:0}}
 #win .big{font-size:3.2rem;animation:logoFloat 2.6s ease-in-out infinite}
 #win h2{font-size:1.45rem;font-weight:900;margin:6px 0 4px}
@@ -259,7 +275,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes wipeReveal{from{opacity:1;clip-path:circle(120% at 50% 44%)}to{opacity:0;clip-path:circle(120% at 50% 44%)}}
 
 /* ================= toast ================= */
-#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:linear-gradient(180deg,#122a4bf5,#0c1c38f5);border:1.5px solid #2dd4bf9e;color:#eafff8;font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 0 18px -4px #2dd4bf73,0 10px 26px -8px #000c;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;max-width:88vw;text-align:center}
+#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:linear-gradient(180deg,#122a4bf5,#0c1c38f5);border:1.5px solid #2dd4bf9e;color:#eafff8;font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 0 22px -4px #2dd4bf99,0 0 38px -8px #2dd4bf54,0 10px 26px -8px #000c;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;max-width:88vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(50%) translateY(4px)}
 
 /* tiny screens */
@@ -357,13 +373,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
         • با لمس هر خانه، واژهٔ <b>افقی</b> آن انتخاب می‌شود؛ با لمس دوبارهٔ همان خانه، جهت به <b>عمودی</b> تغییر می‌کند.<br>
         • با کیبورد داخل بازی، حرف‌ها را تایپ کن؛ بعد از هر حرف به خانهٔ بعد می‌روی.<br>
         • کلید «پاک‌کردن» حرف را حذف می‌کند و به خانهٔ قبلی برمی‌گردد.<br>
-        • هر واژهٔ کامل‌شده قفل می‌شود و سبز رنگ می‌شود.<br>
+        • حرف‌های تایپی کاشی آبی دارند؛ با کامل‌شدن واژه، حرف‌های درست سبز و قفل می‌شوند و حرف‌های اشتباه سرخ می‌شوند تا همان‌ها را عوض کنی.<br>
         • جدول بعدی فقط بعد از حل جدول فعلی باز می‌شود.
       </div>
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۲٫۰</div>
+    <div class="ver">جدولک نسخه ۲٫۱</div>
   </div>
 </div>
 
@@ -406,7 +422,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.10.1";
+const APP_V = "2026.10.10.2";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -630,7 +646,18 @@ let completeCache = {};       // puzzle n -> bool
 const THEME_HEAD = {1:"#060a18",2:"#060a18",3:"#060a18",4:"#060a18",5:"#060a18",
                     6:"#060a18",7:"#060a18",8:"#060a18",9:"#060a18",10:"#060a18"};
 
-/* ================= dynamic layout (grid + keyboard ALWAYS fit) ================= */
+/* ================= dynamic layout (grid + keyboard ALWAYS fit) =================
+   2026-10-10 v2.1 fix: the old estimate forgot that CSS renders each keycap
+   at --kh + 8px (and could raise kh to 60), so on many phones the real
+   keyboard was ~14-24px taller than budgeted — the fixed-size grid then
+   overflowed .grid-zone and was clipped EQUALLY top & bottom, hiding the
+   top row under the «جدول ۱ از ۱۰» bar. Two-part cure:
+   1. the estimate now budgets the TRUE keycap height (kh + 8 each) and caps
+      kh at 56;
+   2. fitGrid() — a measured GUARANTEE pass one frame later: whatever the
+      flexbox ACTUALLY gave the grid zone, the cells are re-fitted so the
+      8×8 grid can never be taller than its zone. The top row is always
+      fully visible, on every device and Telegram viewport state. */
 function layout(){
   if($("app").hidden) return;
   const vw = document.documentElement.clientWidth;
@@ -643,24 +670,41 @@ function layout(){
   const appCS = getComputedStyle($("app"));
   const padV = (parseFloat(appCS.paddingTop)||5) + (parseFloat(appCS.paddingBottom)||4); // includes safe-area inset
   const gapV = (parseFloat(appCS.rowGap)||6) * 5;   // gaps between the 6 sections (header…kbd)
-  const kbdChrome = 6 + 3*10;         // kbd top pad + 10px gaps * 2 between the 3 rows (airy, like the reference)
+  const kbdChrome = 6 + 2*10;        /* kbd padding-top + the 2 gaps between its 3 rows */
+  const keyExtra = 8;                /* CSS draws each keycap (--kh + 8px) tall */
   const gridGaps = 7 * 3;
   const avail = vh - head - banner - status - wprog - padV - gapV;
-  let kh = Math.floor((avail * 0.42 - kbdChrome) / 3);
+  let kh = Math.floor((avail * 0.42 - kbdChrome) / 3) - keyExtra;
   let csz = Math.floor(Math.min((avail * 0.58 - gridGaps) / 8,
                                 (vw - 12 - 7*3) / 8));
-  kh = Math.max(30, Math.min(56, kh));
-  csz = Math.max(26, Math.min(47, csz));
+  kh = Math.max(28, Math.min(54, kh));
+  csz = Math.max(24, Math.min(47, csz));
   /* give leftovers to whichever is starving */
-  const used = csz*8 + gridGaps + kh*3 + kbdChrome;
+  const used = csz*8 + gridGaps + (kh + keyExtra)*3 + kbdChrome;
   if(avail - used > 3){
     const extra = avail - used;
     csz = Math.min(47, csz + Math.floor(extra*0.55/8));
-    kh = Math.min(60, kh + Math.floor(extra*0.45/3));
+    kh = Math.min(56, kh + Math.floor(extra*0.45/3));
   }
   const rs = document.documentElement.style;
   rs.setProperty("--csz", csz+"px");
   rs.setProperty("--kh", kh+"px");
+  /* guarantee pass: after the flexbox settles, re-fit from REAL measurements */
+  requestAnimationFrame(fitGrid);
+}
+/* measured fit — the grid zone's height never depends on the grid itself
+   (it is the only shrinkable flex child with min-height:0), so this reading
+   is stable and loop-free */
+function fitGrid(){
+  if($("app").hidden) return;
+  const zone = document.querySelector(".grid-zone");
+  if(!zone) return;
+  const zoneH = zone.clientHeight;
+  const vw = document.documentElement.clientWidth;
+  if(zoneH <= 0 || vw <= 0) return;
+  let csz = Math.floor(Math.min((zoneH - 21) / 8, (vw - 12 - 21) / 8));
+  csz = Math.max(18, Math.min(47, csz));
+  document.documentElement.style.setProperty("--csz", csz+"px");
 }
 let layoutRaf = 0;
 function scheduleLayout(){
@@ -736,6 +780,7 @@ function renderCellLetter(cell, ch){
   let lt = cell.el.querySelector(":scope > .lt");
   if(!lt){ lt = document.createElement("span"); lt.className = "lt"; cell.el.appendChild(lt); }
   lt.textContent = ch || "";
+  lt.classList.remove("err");   /* err is only re-applied by markWrong after evaluation */
   if(ch){ cell.el.classList.remove("pop"); void cell.el.offsetWidth; cell.el.classList.add("pop"); }
 }
 
@@ -857,8 +902,30 @@ function typeLetter(ch){
   haptic("impact","light");
   persist();
   if(wordSolved(cur.word)){ lockWord(cur.word); return; }
-  if(wordFilled(cur.word)) shakeBanner();
+  if(wordFilled(cur.word)){ markWrong(cur.word, true); shakeBanner(); }
   advance();
+}
+
+/* word completely filled but NOT solved: paint every wrong letter RED so it
+   is unmistakable which cells need fixing. Green stays reserved for letters
+   PROVEN correct (locked words). Correct-but-unconfirmed letters keep the
+   neutral blue tile. This is presentation only — no validation, answer or
+   persistence logic is touched. */
+function markWrong(word, animate){
+  word.cells.forEach(c=>{
+    if(c.locked || !c.el) return;
+    const t = typedCells[c.r+","+c.c];
+    if(!t) return;
+    const lt = c.el.querySelector(":scope > .lt");
+    if(!lt) return;
+    const bad = t !== c.sol;
+    lt.classList.toggle("err", bad);
+    if(bad && animate){
+      c.el.classList.remove("errshake"); void c.el.offsetWidth;
+      c.el.classList.add("errshake");
+      setTimeout(()=>{ c.el.classList.remove("errshake"); }, 420);
+    }
+  });
 }
 
 function backspace(){
@@ -955,6 +1022,9 @@ function openPuzzle(idx){
   });
   applyTheme(P.n, !document.body.className || document.body.className === "theme-1" && idx === 0);
   renderGrid();
+  /* restore the red marks on words previously left completely filled but
+     wrong, so returning to a puzzle keeps the same visual feedback */
+  P.words.forEach(w=>{ if(!w.solved && wordFilled(w)) markWrong(w, false); });
   updateWordProgress();
   renderDots();
   persist();
