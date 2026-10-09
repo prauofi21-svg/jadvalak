@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0b1226">
+<meta name="theme-color" content="#060a18">
 <title>جدولک 🧩</title>
 <!-- bundled locally: telegram.org is unreachable inside Iran without VPN -->
 <script src="telegram-web-app.js"></script>
@@ -32,93 +32,77 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
   --radius:14px;
 }
 
-/* ================= theme palette (10 levels — calm 2026 redesign) ============
-   One coherent family: deep calm nights + soft warm papers. Light cells on
-   dark themes (classic crossword paper-on-dark contrast), mint solved,
-   gentle gold active word, cream clue banner — like the reference design. */
-/* 1 — شب پرستاره (deep navy night) */
-.theme-1{--bg1:#0b1226;--bg2:#1a2a52;--panel:#0d1634ee;--panel-bd:#33477f66;--ink:#e8eeff;--sub:#93a5d8;
- --cell:#f7f9ffef;--cell-bd:#c3cdf0;--cell-ink:#141b38;--void:#0d1735;--kbd:#0e1a3eee;--kbd-bd:#38518f80;--kbd-ink:#e6ecff;
- --banner:#fbf3d9;--banner-bd:#e0cf8a;--banner-ink:#3a2e08;--tag:#1c2b5a;--tag-ink:#ffe9a0;
- --hl:#fde9b399;--hl-cur:#e8b64c;--ok:#bfe8cfcc;--ok-bd:#57a77c;--accent:#7aa2ff;--accent-ink:#0c1230}
-/* 2 — غروم آرام (dusty dusk — replaces the harsh bright-sky theme) */
-.theme-2{--bg1:#1d2033;--bg2:#3a3f5c;--panel:#232742ee;--panel-bd:#4a507566;--ink:#e9eaf6;--sub:#a3a8c6;
- --cell:#f7f6ffee;--cell-bd:#cfcddc;--cell-ink:#23263c;--void:#161a2e;--kbd:#252a47ee;--kbd-bd:#4c547e80;--kbd-ink:#e8e9f6;
- --banner:#faf1dc;--banner-bd:#d9c98e;--banner-ink:#38300a;--tag:#39406b;--tag-ink:#f5e6b8;
- --hl:#fbe3b599;--hl-cur:#d9a648;--ok:#bfe4d0cc;--ok-bd:#5aa07d;--accent:#8f9bd9;--accent-ink:#1d2033}
-/* 3 — کاغذ کرم (classic ivory paper) */
-.theme-3{--bg1:#f3ead3;--bg2:#e9dcc0;--panel:#faf5e6d9;--panel-bd:#b9ab86;--ink:#3b3323;--sub:#7a6f57;
- --cell:#fffdf4;--cell-bd:#c9bb95;--cell-ink:#33301f;--void:#8f8261;--kbd:#f8f2e0e6;--kbd-bd:#c4b58c;--kbd-ink:#3b3323;
- --banner:#fdf7e3;--banner-bd:#cbb77e;--banner-ink:#3a3010;--tag:#4a4130;--tag-ink:#f5eed8;
- --hl:#efdc9fdd;--hl-cur:#a37f2a;--ok:#cfe6c9dd;--ok-bd:#5e8c52;--accent:#8a6d3b;--accent-ink:#fdf7e3}
-/* 4 — جنگل مه‌آلود (misty forest) */
-.theme-4{--bg1:#16241f;--bg2:#2c453c;--panel:#1a2a25ee;--panel-bd:#3d5a4f66;--ink:#e6f0ea;--sub:#9ab5aa;
- --cell:#f4f8f5ef;--cell-bd:#c2cfc5;--cell-ink:#1c2a24;--void:#12211b;--kbd:#1b2e27ee;--kbd-bd:#40584bcc;--kbd-ink:#e4efe9;
- --banner:#f8f2dc;--banner-bd:#d3c58a;--banner-ink:#35300f;--tag:#2c453c;--tag-ink:#e7f3ec;
- --hl:#f2e6bc99;--hl-cur:#c9a949;--ok:#bfe6cdcc;--ok-bd:#5aa383;--accent:#7fbfa5;--accent-ink:#12211b}
-/* 5 — چای عصرگاهی (warm latte — replaces the loud brown) */
-.theme-5{--bg1:#e9dbc9;--bg2:#dbc7ac;--panel:#f7efe0d6;--panel-bd:#b39877;--ink:#3f3021;--sub:#7d6a55;
- --cell:#fffaf3;--cell-bd:#c8ac87;--cell-ink:#3a2c1e;--void:#8f7455;--kbd:#f5ebdae6;--kbd-bd:#c6a988;--kbd-ink:#3f3021;
- --banner:#faf0d6;--banner-bd:#cfb47c;--banner-ink:#3a2f10;--tag:#5c4630;--tag-ink:#f4e8d2;
- --hl:#f5ddb0dd;--hl-cur:#a37e28;--ok:#cde4cbdd;--ok-bd:#5e8c54;--accent:#96703f;--accent-ink:#faf0d6}
-/* 6 — اقیانوس آرام (deep calm teal) */
-.theme-6{--bg1:#0b2b33;--bg2:#144e5a;--panel:#0e313bee;--panel-bd:#2c6a7566;--ink:#e4f2f5;--sub:#8fb5bd;
- --cell:#f2fafcef;--cell-bd:#bcd9dd;--cell-ink:#0e2a30;--void:#082229;--kbd:#10333cee;--kbd-bd:#2f6d7980;--kbd-ink:#e2f0f3;
- --banner:#f8f1da;--banner-bd:#d5c689;--banner-ink:#363010;--tag:#17505c;--tag-ink:#d9f2f5;
- --hl:#f6e7bd99;--hl-cur:#cf9f43;--ok:#bde6d2cc;--ok-bd:#52a584;--accent:#66b8c4;--accent-ink:#082229}
-/* 7 — شامغاز بنفش (violet dusk — replaces the orange desert) */
-.theme-7{--bg1:#241d2e;--bg2:#3d3049;--panel:#292138ee;--panel-bd:#4f416066;--ink:#ece8f4;--sub:#a89fbd;
- --cell:#f8f6fcef;--cell-bd:#d0c9dc;--cell-ink:#25202f;--void:#191423;--kbd:#2a2340ee;--kbd-bd:#54466880;--kbd-ink:#ebe7f4;
- --banner:#f9f1dd;--banner-bd:#d8c790;--banner-ink:#382f0f;--tag:#3d3049;--tag-ink:#efe6f7;
- --hl:#f6e5bb99;--hl-cur:#cda84c;--ok:#c2e5d0cc;--ok-bd:#5aa383;--accent:#9d8fc9;--accent-ink:#191423}
-/* 8 — نئون شب (calm neon night — kept, softened) */
-.theme-8{--bg1:#0a0e16;--bg2:#131a2a;--panel:#141a28ee;--panel-bd:#38c5d638;--ink:#e6f4f8;--sub:#8ba7b5;
- --cell:#1b2638f2;--cell-bd:#4fd8e885;--cell-ink:#e8f6fa;--void:#04070d;--kbd:#161d2dee;--kbd-bd:#3ac6d640;--kbd-ink:#cdeef4;
- --banner:#f5eed6;--banner-bd:#d3c486;--banner-ink:#3a3210;--tag:#123a42;--tag-ink:#c9f0f4;
- --hl:#f2dfa899;--hl-cur:#49d7e6;--ok:#31e0a14d;--ok-bd:#31e0a1;--accent:#49d7e6;--accent-ink:#06232a}
-/* 9 — کهکشان (deep violet galaxy — softened) */
-.theme-9{--bg1:#1c1436;--bg2:#332a5c;--panel:#211a3eee;--panel-bd:#4a3f7566;--ink:#eae6f8;--sub:#a8a0cf;
- --cell:#f7f5ffef;--cell-bd:#cfcaea;--cell-ink:#221a3c;--void:#150f2b;--kbd:#221c42ee;--kbd-bd:#4f467e80;--kbd-ink:#e8e5f6;
- --banner:#f8f0da;--banner-bd:#d4c58c;--banner-ink:#373010;--tag:#332a5c;--tag-ink:#ece5fb;
- --hl:#f4e2b899;--hl-cur:#c9a24a;--ok:#c0e3d0cc;--ok-bd:#59a385;--accent:#8f83cf;--accent-ink:#150f2b}
-/* 10 — طلای سپیده (soft champagne dawn — replaces the bright gold) */
-.theme-10{--bg1:#efe3c8;--bg2:#e3d1a8;--panel:#faf3dfd9;--panel-bd:#bda86f;--ink:#443619;--sub:#83704c;
- --cell:#fffef6;--cell-bd:#cbb377;--cell-ink:#3a2e10;--void:#8f7a4e;--kbd:#f8f0d8e6;--kbd-bd:#c0a865;--kbd-ink:#443619;
- --banner:#fdf8e6;--banner-bd:#c4ad6e;--banner-ink:#3c3212;--tag:#6b572b;--tag-ink:#f7efda;
- --hl:#f3e0aadd;--hl-cur:#96701f;--ok:#cde4c9dd;--ok-bd:#5e8c54;--accent:#9a7b33;--accent-ink:#fdf8e6}
+/* ================= theme palette (2026 neon-glass redesign) =================
+   One coherent futuristic identity, applied to every puzzle:
+   deep navy near-black canvas + subtle gradients + drifting neon particles;
+   accent light in bright blue / electric blue / violet with LIMITED pink
+   highlights; ivory-champagne glass clue panel with neon blue lines;
+   recessed dark-glass empty cells, teal glass filled tiles, animated blue
+   selection ring; glass round keyboard keys with blue/violet edge light. */
+:root{
+  --bg1:#060a18;--bg2:#0a1230;
+  --panel:#0d1730f2;--panel-bd:#4668b880;--ink:#edf3ff;--sub:#93a9dd;
+  --cell:#101d3af2;--cell-bd:#3f6db880;--cell-ink:#eaf3ff;--void:#1a2542;
+  --kbd:#1b2c55f2;--kbd-bd:#4668b880;--kbd-ink:#f0f5ff;
+  --banner:#f7f0de;--banner-bd:#5bc8ff;--banner-ink:#33291a;--tag:#1d9bf0;--tag-ink:#ffffff;
+  --hl:#153a6b;--hl-cur:#45c8ff;--ok:#14b8a6;--ok-bd:#2dd4bf;--accent:#45c8ff;--accent-ink:#06122e;
+}
 
-/* decorative backgrounds (pure CSS, zero images) — all calm gradients */
-.theme-1 #bg,.theme-4 #bg,.theme-6 #bg,.theme-7 #bg,.theme-8 #bg,.theme-9 #bg{background:radial-gradient(120% 90% at 50% 0%,var(--bg2) 0%,var(--bg1) 70%)}
-.theme-2 #bg{background:linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 68%)}
-.theme-3 #bg{background:
-  repeating-linear-gradient(0deg,#00000005 0 2px,transparent 2px 4px),
-  linear-gradient(165deg,var(--bg1),var(--bg2))}
-.theme-5 #bg{background:linear-gradient(170deg,var(--bg1) 0%,var(--bg2) 100%)}
-.theme-10 #bg{background:radial-gradient(140% 90% at 60% 0%,var(--bg2) 0%,var(--bg1) 78%)}
-/* tiny stars for the night / galaxy themes */
-.theme-1 #bg::after,.theme-9 #bg::after{content:"";position:absolute;inset:0;background-image:
-  radial-gradient(1.5px 1.5px at 12% 18%,#fff9 50%,transparent 51%),
-  radial-gradient(1px 1px at 30% 8%,#fff8 50%,transparent 51%),
-  radial-gradient(1.5px 1.5px at 55% 24%,#fff7 50%,transparent 51%),
-  radial-gradient(1px 1px at 72% 12%,#fff8 50%,transparent 51%),
-  radial-gradient(2px 2px at 88% 30%,#fff6 50%,transparent 51%),
-  radial-gradient(1px 1px at 8% 55%,#fff5 50%,transparent 51%),
-  radial-gradient(1.5px 1.5px at 40% 60%,#fff4 50%,transparent 51%),
-  radial-gradient(1px 1px at 65% 70%,#fff5 50%,transparent 51%),
-  radial-gradient(1.5px 1.5px at 90% 82%,#fff4 50%,transparent 51%),
-  radial-gradient(1px 1px at 18% 88%,#fff5 50%,transparent 51%);animation:twinkle 5s ease-in-out infinite alternate}
-.theme-8 #bg::after{content:"";position:absolute;inset:0;background-image:
-  radial-gradient(90% 40% at 50% 108%,#49d7e612 0%,transparent 60%),
-  radial-gradient(70% 34% at 18% -8%,#c9a24a14 0%,transparent 60%)}
-@keyframes twinkle{from{opacity:.55}to{opacity:1}}
+/* deep-space canvas: layered gradients + drifting neon particles + faint
+   twinkling stars — ALL pure CSS, zero images, transform-only animation */
+#bg{background:
+  radial-gradient(120% 80% at 50% -10%,#14245cd9 0%,transparent 55%),
+  radial-gradient(90% 60% at 88% 112%,#23144d8c 0%,transparent 62%),
+  radial-gradient(70% 50% at 10% 106%,#0a2b4a80 0%,transparent 58%),
+  linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 74%)}
+#bg::before{content:"";position:absolute;inset:-42%;background-image:
+  radial-gradient(2.5px 2.5px at 12% 22%,#4cc9f0a8 50%,transparent 51%),
+  radial-gradient(2px 2px at 28% 68%,#8b5cf68f 50%,transparent 51%),
+  radial-gradient(2px 2px at 44% 12%,#4cc9f07d 50%,transparent 51%),
+  radial-gradient(2.5px 2.5px at 62% 82%,#f472b663 50%,transparent 51%),
+  radial-gradient(2px 2px at 78% 35%,#4cc9f08c 50%,transparent 51%),
+  radial-gradient(1.8px 1.8px at 90% 60%,#8b5cf67a 50%,transparent 51%),
+  radial-gradient(2px 2px at 8% 85%,#4cc9f066 50%,transparent 51%),
+  radial-gradient(1.8px 1.8px at 55% 48%,#7dd3fc55 50%,transparent 51%),
+  radial-gradient(2.2px 2.2px at 34% 40%,#38bdf863 50%,transparent 51%),
+  radial-gradient(2px 2px at 70% 8%,#a78bfa58 50%,transparent 51%);
+  animation:drift 46s ease-in-out infinite alternate}
+@keyframes drift{from{transform:translate3d(-3%,-2%,0) scale(1.03)}to{transform:translate3d(3%,2.5%,0) scale(1.07)}}
+#bg::after{content:"";position:absolute;inset:0;background-image:
+  radial-gradient(1.5px 1.5px at 12% 18%,#fff7 50%,transparent 51%),
+  radial-gradient(1px 1px at 30% 8%,#fff6 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 55% 24%,#fff5 50%,transparent 51%),
+  radial-gradient(1px 1px at 72% 12%,#fff6 50%,transparent 51%),
+  radial-gradient(2px 2px at 88% 30%,#fff4 50%,transparent 51%),
+  radial-gradient(1px 1px at 8% 55%,#fff3 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 40% 60%,#fff2 50%,transparent 51%),
+  radial-gradient(1px 1px at 65% 70%,#fff3 50%,transparent 51%),
+  radial-gradient(1.5px 1.5px at 90% 82%,#fff2 50%,transparent 51%),
+  radial-gradient(1px 1px at 18% 88%,#fff3 50%,transparent 51%);animation:twinkle 6s ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.5}to{opacity:.95}}
 
 /* ================= app shell ================= */
 #app{height:100dvh;display:flex;flex-direction:column;padding:5px 6px calc(4px + env(safe-area-inset-bottom));gap:6px;opacity:0;animation:appIn .5s ease .05s forwards}
 @keyframes appIn{to{opacity:1}}
 
-/* ---- clue banner (top fixed hint bar) ---- */
-.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:var(--banner);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;box-shadow:0 6px 18px -8px #0005;transition:background-color .5s,border-color .5s}
-.clue-tag{flex:0 0 auto;background:var(--tag);color:var(--tag-ink);font-weight:800;font-size:.95rem;padding:5px 12px;border-radius:999px;white-space:nowrap;box-shadow:inset 0 -2px 0 #0002}
+/* ---- slim app header: glowing geometric logo + جدولک wordmark ---- */
+.apphead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:34px;padding:1px 2px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.logo-mark{flex:0 0 auto;display:grid;grid-template-columns:10px 10px;grid-template-rows:10px 10px;gap:2.5px;padding:3.5px;border-radius:8px;background:linear-gradient(135deg,#13234ad9,#0a1428d9);border:1px solid #3d6db880;box-shadow:0 0 12px #45c8ff3d,inset 0 0 7px #45c8ff1f}
+.logo-mark i{display:block;border-radius:2.5px}
+.logo-mark i:nth-child(1){background:linear-gradient(135deg,#4cc9f0,#2563eb);box-shadow:0 0 6px #4cc9f0a8}
+.logo-mark i:nth-child(2){background:linear-gradient(135deg,#8b5cf6,#6366f1);box-shadow:0 0 6px #8b5cf6a8}
+.logo-mark i:nth-child(3){background:linear-gradient(135deg,#f472b6,#8b5cf6);box-shadow:0 0 6px #f472b68c}
+.logo-mark i:nth-child(4){background:linear-gradient(135deg,#38bdf8,#22d3ee);box-shadow:0 0 6px #38bdf8a8}
+.brand-title{font-size:1.18rem;font-weight:900;color:#f2f7ff;line-height:1.08;text-shadow:0 0 16px #4cc9ff59}
+.brand-sub{font-size:.55rem;letter-spacing:.34em;color:#7f9cd8;font-weight:700;direction:ltr;text-shadow:0 0 8px #45c8ff33;line-height:1.1}
+
+/* ---- clue banner: ivory-champagne glass panel with neon blue lines ---- */
+.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#f9f3e2 0%,#efe5cb 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;box-shadow:0 0 16px -3px #45c8ff73,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59;transition:box-shadow .3s}
+.clue-banner.shake{box-shadow:0 0 16px -3px #f472b6a8,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6}
+.clue-tag{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:linear-gradient(165deg,#1273d6 0%,#219ee8 100%);color:var(--tag-ink);font-weight:900;font-size:.95rem;padding:5px 12px;border-radius:12px;white-space:nowrap;box-shadow:0 0 12px #38bdf880,inset 0 1px 0 #ffffff55,inset 0 -2px 0 #0c5aa455;text-shadow:0 1px 1px #0a3f6699}
+.clue-tag .dir-ic{width:17px;height:9px;flex:0 0 auto;filter:drop-shadow(0 1px 1px #0a3f6666)}
+.clue-tag .dir-ic path{stroke:currentColor}
 .clue-text{flex:1;min-width:0;font-size:18px;font-weight:800;line-height:1.55;color:var(--banner-ink);word-break:break-word;max-height:56px;overflow-y:auto;overflow-x:hidden}
 .clue-banner.pop .clue-text,.clue-banner.pop .clue-tag{animation:clueIn .32s cubic-bezier(.2,.8,.3,1)}
 @keyframes clueIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -127,34 +111,45 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 
 /* ---- slim status row (menu + level + dots) ---- */
 .status-row{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:30px;padding:0 2px}
-.menu-btn{width:32px;height:32px;border-radius:10px;background:var(--panel);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1rem;font-weight:800;transition:transform .15s,background-color .5s}
+.menu-btn{width:32px;height:32px;border-radius:10px;background:linear-gradient(180deg,#16294fd9,#0e1c3cd9);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1rem;font-weight:800;color:var(--ink);box-shadow:inset 0 1px 0 #ffffff17,0 0 10px #45c8ff26;transition:transform .15s}
 .menu-btn:active{transform:scale(.88)}
-.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink)}
+.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 0 10px #45c8ff2e}
 .dots{flex:1;display:flex;gap:4px;justify-content:flex-start;overflow:hidden}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--panel);border:1px solid var(--panel-bd);transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
-.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent);animation:dotPulse 2.4s ease-in-out infinite}
-@keyframes dotPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}}
-.dot.done{background:var(--accent);border-color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;background:#0d1c3e;border:1px solid #3d6db880;box-shadow:inset 0 1px 2px #0009;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
+.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px #45c8ff66,0 0 9px #45c8ff8c;animation:dotPulse 2.6s ease-in-out infinite}
+@keyframes dotPulse{50%{box-shadow:0 0 0 4px #45c8ff3d,0 0 13px #45c8ffb3}}
+.dot.done{background:linear-gradient(180deg,#4cc9f0,#2563eb);border-color:#7dd3fc;box-shadow:0 0 8px #45c8ff8c}
 .dot.lock{opacity:.35;cursor:default}
 .dot.just-unlocked{animation:dotUnlock .7s cubic-bezier(.34,1.56,.64,1)}
 @keyframes dotUnlock{40%{transform:scale(2)}}
 
-/* ---- player count chip ---- */
-.pcount{flex:0 0 auto;font-size:.72rem;font-weight:800;color:var(--sub);white-space:nowrap;padding:3px 9px;background:var(--panel);border:1px solid var(--panel-bd);border-radius:999px;line-height:1.25;opacity:0;animation:appIn .5s ease .3s forwards}
+/* ---- player count chip (lives in the header) ---- */
+.pcount{flex:0 0 auto;font-size:.72rem;font-weight:800;color:#bcd0f5;white-space:nowrap;padding:3px 10px;background:linear-gradient(180deg,#13234acc,#0d1c3ecc);border:1px solid #3d6db873;border-radius:999px;line-height:1.25;box-shadow:inset 0 1px 0 #ffffff14,0 0 10px #45c8ff1f;opacity:0;animation:appIn .5s ease .3s forwards}
 
-/* ---- grid ---- */
-.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden}
-.grid-wrap{display:grid;grid-template-columns:repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px}
+/* ---- grid: the visual focal point (soft blue halo behind, zero layout cost) ---- */
+.grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden;position:relative}
+.grid-zone::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,470px);aspect-ratio:1/1;background:radial-gradient(50% 50% at 50% 50%,#2f6db933 0%,#8b5cf61c 45%,transparent 72%);pointer-events:none}
+.grid-wrap{display:grid;grid-template-columns:repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px;position:relative}
 /* classic crossword corner number — small chip at the top-right of each word's START cell */
-.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:var(--cell);font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:var(--sub);pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2}
-.num.on{color:var(--accent);font-weight:900;transform:scale(1.18);box-shadow:0 0 0 1.5px var(--accent)}
-.cell{width:var(--csz);height:var(--csz);background:var(--cell);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
-.cell.void{background:var(--void);border-color:transparent;cursor:default}
-.cell.hl{background:var(--hl)}
-.cell.cur{border-color:var(--hl-cur);box-shadow:0 0 0 2px var(--hl-cur) inset;background:var(--hl)}
-.cell.origin::before{content:"";position:absolute;top:2px;right:2px;width:0;height:0;border-top:7px solid var(--hl-cur);border-left:7px solid transparent;opacity:.9;pointer-events:none}
-.cell.locked{background:var(--ok);border-color:var(--ok-bd);color:var(--cell-ink)}
-.cell .lt{pointer-events:none}
+.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:#0a1428e6;font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:#7fd4ff;pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2;text-shadow:0 0 6px #45c8ff8c}
+.num.on{color:#ffffff;background:linear-gradient(165deg,#1273d6,#219ee8);font-weight:900;transform:scale(1.18);box-shadow:0 0 10px #38bdf8b3}
+/* empty cells = dark glass tiles, slightly recessed, glowing edges */
+.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,#101d3af2 0%,#0a1428f2 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 #4cc9f01f,0 0 6px #2f6db930;transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
+/* blocked cells = matte grey-blue blocks, NO glow — clearly different from the glowing sockets */
+.cell.void{background:#1a2542;border-color:#26325acc;box-shadow:inset 0 1px 3px #00000080;cursor:default}
+/* active word = electric-blue wash over the dark glass */
+.cell.hl{background:linear-gradient(180deg,#153a6bf5 0%,#0d1f42f5 100%);border-color:#4cc9f0cc;box-shadow:inset 0 2px 6px #0009,0 0 8px #45c8ff45}
+/* selected cell = animated bright blue ring + soft glow */
+.cell.cur{background:linear-gradient(180deg,#1a4a80f8 0%,#10294ef8 100%);border-color:#45c8ff;box-shadow:inset 0 2px 6px #0009,0 0 12px #45c8ff8f}
+.cell.cur::after{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid #45c8ff;box-shadow:0 0 12px #45c8ffb3,inset 0 0 8px #45c8ff55;animation:curGlow 1.6s ease-in-out infinite;pointer-events:none;z-index:3}
+@keyframes curGlow{50%{opacity:.42}}
+.cell.origin::before{content:"";position:absolute;top:2px;right:2px;width:0;height:0;border-top:7px solid var(--hl-cur);border-left:7px solid transparent;opacity:.9;pointer-events:none;z-index:2}
+/* filled letter = teal glass tile with real depth, sitting inside the socket */
+.cell .lt{position:absolute;inset:2px;display:grid;place-items:center;border-radius:5px;background:linear-gradient(180deg,#17bdb0 0%,#0b8a80 100%);box-shadow:inset 0 1px 0 #ffffff4d,inset 0 -3px 5px #06554e99,0 2px 6px -1px #0c8f8466,0 0 10px #14b8a638;color:#f4fffd;text-shadow:0 1px 2px #00332ecc;pointer-events:none}
+.cell .lt:empty{display:none}
+/* solved = richer teal-green glass + neon success edge */
+.cell.locked{background:linear-gradient(180deg,#0f3a36f2 0%,#0a2622f2 100%);border-color:#2dd4bf99;box-shadow:inset 0 2px 6px #000a,0 0 9px #2dd4bf47}
+.cell.locked .lt{background:linear-gradient(180deg,#2fe0c0 0%,#14b8a6 55%,#0d9488 100%);box-shadow:inset 0 1px 0 #ffffff5c,inset 0 -3px 5px #06554e99,0 0 13px #2dd4bf70}
 .cell span{pointer-events:none;animation:letterIn .16s cubic-bezier(.2,.8,.3,1.4)}
 @keyframes letterIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
 .cell.pop{animation:cellPop .3s cubic-bezier(.34,1.56,.64,1)}
@@ -167,28 +162,35 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 .word-sweep::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 20%,#ffffffb8 50%,transparent 80%);animation:sweep .55s ease}
 @keyframes sweep{from{transform:translateX(120%)}to{transform:translateX(-120%)}}
 
-/* ---- word progress ---- */
-.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:var(--sub);min-height:18px}
-.wbar{flex:1;height:6px;border-radius:99px;background:var(--panel);border:1px solid var(--panel-bd);overflow:hidden}
-.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--hl-cur),var(--accent));background-size:200% 100%;transition:width .5s cubic-bezier(.2,.8,.3,1);animation:shimmer 2.6s linear infinite}
-@keyframes shimmer{to{background-position:-200% 0}}
+/* ---- word progress (below the grid) ---- */
+.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:#9db4e8;min-height:18px}
+.wbar{flex:1;height:6px;border-radius:99px;background:#0d1c3e;border:1px solid #3d6db866;overflow:hidden;box-shadow:inset 0 1px 3px #0008}
+.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#2563eb,#4cc9f0 45%,#8b5cf6);box-shadow:0 0 8px #4cc9f066;transition:width .5s cubic-bezier(.2,.8,.3,1)}
 
-/* ---- keyboard — EXACT replica of the user's reference image (2026-10-08):
-   LEFT-TO-RIGHT 3-row layout 11 + 11 + 10 letters + wide ⌫ at the FAR RIGHT
-   of the bottom row. Keys are INVISIBLE at rest (letters float on the page
-   background, exactly like the reference: no keycaps, no borders) with airy
-   vertical spacing; a soft halo + press scale give touch feedback. ---- */
+/* ---- keyboard — the user's STANDARD layout, unchanged (2026-10-08 v3):
+   LEFT-TO-RIGHT 3-row 11 + 11 + 10 letters + wide ⌫ at the FAR RIGHT of the
+   bottom row, which on screen reads RIGHT-TO-LEFT exactly as the user wrote:
+     row 1: ج ح خ ه ع غ ف ق ث ص ض
+     row 2: گ ک م ن ت ا ل ب ی س ش
+     row 3: ⌫ چ و پ د ذ ر ز ژ ط ظ
+   2026-10-10 v4 redesign: round GLASS keycaps with subtle blue/violet edge
+   light and chic pressed states (letters/order/⌫ position untouched). ---- */
 .kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 0;direction:ltr}
-.krow{display:flex;gap:4px;justify-content:center}
-.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:transparent;border:none;border-radius:14px;font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;transition:transform .09s,filter .09s;cursor:pointer;overflow:hidden}
-.key::after{content:"";position:absolute;inset:0;border-radius:inherit;background:var(--kbd);opacity:0;transform:scale(.55);pointer-events:none}
-.key:active,.key.pressed{transform:scale(1.14);filter:brightness(1.22)}
+.krow{display:flex;gap:5px;justify-content:center}
+.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,#1b2c55f2 0%,#131f40f2 100%);border:1px solid #4668b89e;border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 9px #45c8ff24;transition:transform .09s,filter .09s,box-shadow .09s;cursor:pointer}
+/* middle row gets the violet edge light (subtle blue/violet alternation) */
+.krow:nth-child(2) .key{border-color:#6d5fc09e;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 9px #8b5cf62b}
+.key:active,.key.pressed{transform:scale(.9);filter:brightness(1.28);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 15px #45c8ff7d,0 0 5px #8b5cf64d}
+.key::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid #45c8ff;opacity:0;transform:scale(.82);pointer-events:none}
 .key.pressed::after{animation:halo .34s ease-out}
-@keyframes halo{from{opacity:.5;transform:scale(.55)}to{opacity:0;transform:scale(1.18)}}
+@keyframes halo{from{opacity:.75;transform:scale(.82)}to{opacity:0;transform:scale(1.12)}}
 /* wide icon-only backspace at the END of the bottom row — FAR RIGHT in the
    keyboard's LTR direction: the ⌫ is the FIRST key from the right in the
-   user's standard layout (ردیف سوم: ضربدر، چ و پ د ذ ر ز ژ ط ظ) */
-.key.bk{max-width:86px}
+   user's standard layout (ردیف سوم: ضربدر، چ و پ د ذ ر ز ژ ط ظ).
+   Visually DISTINCT: violet→pink neon glass so it is instantly recognizable. */
+.key.bk{max-width:86px;background:linear-gradient(180deg,#3a2560f2 0%,#241547f2 100%);border-color:#c084fc80;box-shadow:inset 0 1px 0 #ffffff22,inset 0 -3px 6px #00000080,0 0 13px #a855f75c,0 0 5px #ec48994a;color:#fbeaff}
+.key.bk:active,.key.bk.pressed{transform:scale(.9);filter:brightness(1.3);box-shadow:inset 0 1px 0 #ffffff30,inset 0 -2px 4px #0006,0 0 18px #e879f9a3,0 0 6px #ec48997a}
+.key.bk::after{border-color:#e879f9}
 .key.bk svg{width:58%;height:58%;max-width:30px;max-height:30px;fill:currentColor}
 
 /* ================= full screens (loading / error) ================= */
@@ -208,9 +210,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes logoFloat{50%{transform:translateY(-9px) rotate(-4deg)}}
 .screen h2{font-size:1.5rem;font-weight:800}
 .screen p{font-size:.95rem;line-height:1.9;color:var(--sub);font-weight:600;max-width:330px}
-.btn{background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 6px 16px -6px #0006;transition:transform .15s,filter .15s;min-width:240px}
+.btn{background:linear-gradient(165deg,#2ea3f0 0%,#1f7fe0 100%);color:#ffffff;font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 0 16px -2px #45c8ff8c,0 6px 16px -6px #0008,inset 0 1px 0 #ffffff4d;text-shadow:0 1px 1px #0a3f6680;transition:transform .15s,filter .15s;min-width:240px}
 .btn:active{transform:scale(.95)}
-.btn.ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:none}
+.btn.ghost{background:linear-gradient(180deg,#16294fd9,#0e1c3cd9);color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:inset 0 1px 0 #ffffff17,0 0 12px #45c8ff2b;text-shadow:none}
 .btn.busy{pointer-events:none;filter:saturate(.6) brightness(.9)}
 .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--panel-bd);border-top-color:var(--accent);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -220,7 +222,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 #sheet[hidden]{display:none}
 #sheet .scrim{position:absolute;inset:0;background:#00000073;animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0}}
-#sheet .card{position:relative;width:min(430px,100%);background:var(--panel);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
+#sheet .card{position:relative;width:min(430px,100%);background:linear-gradient(180deg,#101d3af7 0%,#0b1530f7 100%);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px -8px #000c,0 0 22px -6px #45c8ff40;animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
 @keyframes sheetUp{from{transform:translateY(60%);opacity:.4}}
 #sheet .grab{width:44px;height:5px;border-radius:9px;background:var(--panel-bd);margin:0 auto 12px}
 #sheet h3{font-size:1.05rem;font-weight:800;margin-bottom:10px}
@@ -238,7 +240,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 /* ================= win overlay + confetti ================= */
 #win{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#000000a6}
 #win[hidden]{display:none}
-#win .card{width:min(360px,88vw);background:var(--panel);border:1.5px solid var(--panel-bd);border-radius:24px;padding:30px 24px;text-align:center;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
+#win .card{width:min(360px,88vw);background:linear-gradient(180deg,#101d3af9 0%,#0b1530f9 100%);border:1.5px solid #4cc9f080;border-radius:24px;padding:30px 24px;text-align:center;box-shadow:0 0 30px -6px #45c8ff73,0 20px 50px -12px #000d,inset 0 1px 0 #ffffff1f;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
 @keyframes winIn{from{transform:scale(.55) translateY(30px);opacity:0}}
 #win .big{font-size:3.2rem;animation:logoFloat 2.6s ease-in-out infinite}
 #win h2{font-size:1.45rem;font-weight:900;margin:6px 0 4px}
@@ -257,11 +259,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes wipeReveal{from{opacity:1;clip-path:circle(120% at 50% 44%)}to{opacity:0;clip-path:circle(120% at 50% 44%)}}
 
 /* ================= toast ================= */
-#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:var(--panel);border:1.5px solid var(--ok-bd);color:var(--ink);font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 10px 26px -8px #000a;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;max-width:88vw;text-align:center}
+#toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:linear-gradient(180deg,#122a4bf5,#0c1c38f5);border:1.5px solid #2dd4bf9e;color:#eafff8;font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 0 18px -4px #2dd4bf73,0 10px 26px -8px #000c;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;max-width:88vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(50%) translateY(4px)}
 
 /* tiny screens */
 @media (max-height:640px){
+  .apphead{min-height:30px}
+  .brand-title{font-size:1.02rem}
   .clue-banner{height:62px}
   .clue-text{font-size:16px;max-height:48px}
 }
@@ -296,6 +300,16 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 
 <!-- ============ main app ============ -->
 <div id="app" hidden>
+  <header class="apphead" id="apphead">
+    <div class="brand">
+      <div class="logo-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="brand-txt">
+        <div class="brand-title">جدولک</div>
+        <div class="brand-sub">JADVALAK</div>
+      </div>
+    </div>
+    <span class="pcount" id="pcount" hidden>👥</span>
+  </header>
   <div class="clue-banner" id="banner">
     <span class="clue-tag" id="clue-tag">افقی ۱</span>
     <span class="clue-text" id="clue-text">…</span>
@@ -304,7 +318,6 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
     <button class="menu-btn" id="btn-menu" aria-label="منو">⋮</button>
     <span class="lvl-label" id="lvl-label">جدول ۱ از ۱۰</span>
     <div class="dots" id="dots"></div>
-    <span class="pcount" id="pcount" hidden>👥</span>
   </div>
   <div class="grid-zone"><div class="grid-wrap" id="grid-wrap"></div></div>
   <div class="wprog" id="wprog">
@@ -350,7 +363,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۱٫۲</div>
+    <div class="ver">جدولک نسخه ۲٫۰</div>
   </div>
 </div>
 
@@ -393,7 +406,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.08.2";
+const APP_V = "2026.10.10.1";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -614,8 +627,8 @@ let day = null, models = [], pIdx = 0, P = null, cur = null;
 let typedCells = {};          // "r,c" -> letter  (current puzzle)
 let progress = {cur:0, typed:{}};
 let completeCache = {};       // puzzle n -> bool
-const THEME_HEAD = {1:"#0b1226",2:"#1d2033",3:"#f3ead3",4:"#16241f",5:"#e9dbc9",
-                    6:"#0b2b33",7:"#241d2e",8:"#0a0e16",9:"#1c1436",10:"#efe3c8"};
+const THEME_HEAD = {1:"#060a18",2:"#060a18",3:"#060a18",4:"#060a18",5:"#060a18",
+                    6:"#060a18",7:"#060a18",8:"#060a18",9:"#060a18",10:"#060a18"};
 
 /* ================= dynamic layout (grid + keyboard ALWAYS fit) ================= */
 function layout(){
@@ -623,15 +636,16 @@ function layout(){
   const vw = document.documentElement.clientWidth;
   let vh = window.innerHeight;
   try{ if(TG && TG.viewportStableHeight) vh = TG.viewportStableHeight; }catch(e){}
+  const head = $("apphead").offsetHeight || 34;
   const banner = $("banner").offsetHeight || 74;
   const status = $("status-row").offsetHeight || 30;
   const wprog = $("wprog").offsetHeight || 18;
   const appCS = getComputedStyle($("app"));
   const padV = (parseFloat(appCS.paddingTop)||5) + (parseFloat(appCS.paddingBottom)||4); // includes safe-area inset
-  const gapV = (parseFloat(appCS.rowGap)||6) * 4;   // gaps between the 5 sections
+  const gapV = (parseFloat(appCS.rowGap)||6) * 5;   // gaps between the 6 sections (header…kbd)
   const kbdChrome = 6 + 3*10;         // kbd top pad + 10px gaps * 2 between the 3 rows (airy, like the reference)
   const gridGaps = 7 * 3;
-  const avail = vh - banner - status - wprog - padV - gapV;
+  const avail = vh - head - banner - status - wprog - padV - gapV;
   let kh = Math.floor((avail * 0.42 - kbdChrome) / 3);
   let csz = Math.floor(Math.min((avail * 0.58 - gridGaps) / 8,
                                 (vw - 12 - 7*3) / 8));
@@ -741,10 +755,16 @@ function renderDots(){
   });
 }
 
+/* direction indicator: inline SVG arrows (no font-glyph risk, no bidi
+   surprises) — horizontal ↔ / vertical ↕, drawn not typed */
+const DIR_ICONS = {
+  h:'<svg class="dir-ic" viewBox="0 0 20 10" aria-hidden="true"><path d="M5 1 1 5l4 4M15 1l4 4-4 4M1 5h18" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  v:'<svg class="dir-ic" viewBox="0 0 10 20" aria-hidden="true"><path d="M1 5 5 1l4 4M1 15l4 4 4-4M5 1v18" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
 function updateBanner(){
   if(!cur) return;
   const w = cur.word;
-  $("clue-tag").textContent = (w.d==="h" ? "افقی " : "عمودی ") + fa(w.num || 1);
+  $("clue-tag").innerHTML = DIR_ICONS[w.d||"h"] + "<span>" + ((w.d==="h" ? "افقی " : "عمودی ") + fa(w.num || 1)) + "</span>";
   $("clue-text").textContent = w.clue || "…";
   $("clue-text").scrollTop = 0;
   const b = $("banner");
@@ -961,7 +981,7 @@ function puzzleComplete(){
 
 /* ================= confetti & toast ================= */
 function confetti(count){
-  const colors = ["#fbbf24","#f472b6","#34d399","#60a5fa","#a78bfa","#f87171","#fde68a"];
+  const colors = ["#4cc9f0","#8b5cf6","#2dd4bf","#f472b6","#fde68a","#38bdf8","#a78bfa"];
   for(let i=0;i<count;i++){
     const el = document.createElement("div"); el.className = "confetti";
     el.style.left = (2+Math.random()*96)+"vw";
