@@ -63,7 +63,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.10.1"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.10.2"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
