@@ -32,42 +32,54 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
   --radius:14px;
 }
 
-/* ================= theme palette (2026 neon-glass redesign, v2.1) =================
-   One coherent futuristic identity, applied to every puzzle:
-   deep navy near-black canvas + subtle gradients + drifting neon particles;
-   accent light in bright blue / electric blue / violet with LIMITED pink
-   highlights; ivory-champagne glass clue panel with neon blue light-line;
-   recessed dark-glass empty cells; typed letters = electric-BLUE glass,
+/* ================= per-puzzle neon palettes (2026-10-10 v2.2) =================
+   SAME neon-glass design language, now with a DIFFERENT vivid identity per
+   puzzle (user: «در هر جدول رنگ‌ها و تابش‌های جدید جذاب») — azure, violet,
+   amber, aqua, fuchsia, tangerine, periwinkle, rose, silver, purple.
+   Eye-safety: every canvas stays deep dark; glows are translucent
+   (alpha <= b3); no pure-white blooms; prefers-reduced-motion respected.
+   :root = theme 1 (azure) and holds the EXACT v2.1 values — puzzle 1 is
+   pixel-identical to the previous release. body.theme-N swaps the palette
+   during the circular wipe. UNIVERSAL semantics in every theme:
    wrong letters (filled word) = rose-red glass, locked/solved = teal-green
-   glass only; animated blue selection ring; glass round keyboard keys with
-   blue/violet edge light. Green is NEVER shown for an unverified letter. */
+   glass only, success toast = teal. Green is NEVER shown for an
+   unverified letter; red is never a theme accent. */
 :root{
-  --bg1:#060a18;--bg2:#0a1230;
-  --panel:#0d1730f2;--panel-bd:#4668b880;--ink:#edf3ff;--sub:#93a9dd;
-  --cell:#101d3af2;--cell-bd:#3f6db880;--cell-ink:#eaf3ff;--void:#1a2542;
-  --kbd:#1b2c55f2;--kbd-bd:#4668b880;--kbd-ink:#f0f5ff;
-  --banner:#f7f0de;--banner-bd:#5bc8ff;--banner-ink:#33291a;--tag:#1d9bf0;--tag-ink:#ffffff;
-  --hl:#153a6b;--hl-cur:#45c8ff;--ok:#14b8a6;--ok-bd:#2dd4bf;--accent:#45c8ff;--accent-ink:#06122e;
+  --void:#1a2542;--ok:#14b8a6;--ok-bd:#2dd4bf;
 }
+
+:root{--bg1:#060a18;--bg2:#0a1230;--bgA:#14245cd9;--bgB:#23144d8c;--bgC:#0a2b4a80;--ink:#edf3ff;--sub:#93a9dd;--panel:#0d1730f2;--panel-bd:#4668b880;--cell:#101d3af2;--cell-bg2:#0a1428f2;--cell-bd:#3f6db880;--cell-in2:#4cc9f01f;--cell-halo:#2f6db93d;--cell-ink:#eaf3ff;--kbd:#1b2c55f2;--kbd-bg2:#131f40f2;--kbd-bd:#4668b89e;--kbd-ink:#f0f5ff;--kbd-glow:#45c8ff36;--kbd2-bd:#6d5fc09e;--kbd2-glow:#8b5cf63d;--key-press1:#45c8ffa3;--key-press2:#8b5cf666;--banner-bg1:#f9f3e2;--banner-bg2:#efe5cb;--banner-ink:#33291a;--banner-bd:#5bc8ff;--banner-glow1:#45c8ff96;--banner-glow2:#45c8ff54;--line1:#5bc8ffd9;--line2:#7cc4ffeb;--line3:#8b5cf6cc;--line-sh1:#45c8ffb3;--line-sh2:#45c8ff59;--tag:#1d9bf0;--tag-ink:#ffffff;--tag1:#1273d6;--tag2:#219ee8;--tag-glow1:#38bdf8b3;--tag-glow2:#219ee859;--tag-deep:#0c5aa455;--tag-txt-sh:#0a3f6699;--chip-bg1:#16294fd9;--chip-bg2:#0e1c3cd9;--chip-glow:#45c8ff26;--pc-ink:#bcd0f5;--dot-bg:#0d1c3e;--dot-bd:#3d6db880;--dot-done1:#4cc9f0;--dot-done2:#2563eb;--dot-done-bd:#7dd3fc;--dot-cur-sh1:#45c8ff66;--dot-cur-sh2:#45c8ffb3;--dot-cur-sh3:#45c8ff4d;--dot-cur-sh4:#45c8ffd9;--halo1:#2f6db94d;--halo2:#8b5cf62b;--num-bg:#0a1428e6;--num-c:#7fd4ff;--num-sh:#45c8ffb3;--hl:#153a6b;--hl-bg1:#153a6bf5;--hl-bg2:#0d1f42f5;--hl-bd:#4cc9f0cc;--hl-glow:#45c8ff45;--hl-cur:#45c8ff;--cur-bg1:#1a4a80f8;--cur-bg2:#10294ef8;--cur-glow:#45c8ffb3;--ring-edge:#45c8ff;--ring-sh1:#45c8ffd9;--ring-sh2:#45c8ff73;--ring-in:#45c8ff66;--lt-bg1:#37a4f5;--lt-bg2:#1d63d8;--lt-deep:#0a2a6e99;--lt-drop:#1d63d866;--lt-glow:#45c8ff4d;--lt-ink:#f4faff;--lt-txt-sh:#062042cc;--wprog-c:#9db4e8;--soft-sh:#45c8ff33;--wbar-1:#2563eb;--wbar-2:#4cc9f0;--wbar-3:#8b5cf6;--wbar-glow:#4cc9f099;--wbar-glow2:#2563eb59;--brand-sh1:#4cc9ff8c;--brand-sh2:#3b82f673;--brand-sub:#7f9cd8;--acc-tsh:#45c8ff47;--btn-bg1:#2ea3f0;--btn-bg2:#1f7fe0;--btn-glow1:#45c8ffb3;--btn-glow2:#45c8ff66;--btn-txt-sh:#0a3f6680;--btn-ink:#ffffff;--sheet-bg1:#101d3af7;--sheet-bg2:#0b1530f7;--sheet-glow:#45c8ff5c;--win-bd:#4cc9f080;--win-glow1:#45c8ff99;--win-glow2:#45c8ff54;--accent:#45c8ff;--accent-ink:#06122e;--pa1:#4cc9f0a8;--pa2:#8b5cf68f;--pa3:#4cc9f07d;--pa4:#f472b663;--pa5:#4cc9f08c;--pa6:#8b5cf67a;--pa7:#4cc9f066;--pa8:#7dd3fc55;--pa9:#38bdf863;--pa10:#8b5cf658}
+
+/* ---- one palette per puzzle: body.theme-1 … body.theme-10 ---- */
+body.theme-2{--bg1:#090614;--bg2:#130b26;--bgA:#2a1a55d9;--bgB:#1c0d3f8c;--bgC:#1c0f3880;--ink:#f1edff;--sub:#a79ada;--panel:#150f30f2;--panel-bd:#7a68c080;--cell:#191240f2;--cell-bg2:#0f0a28f2;--cell-bd:#6a58b880;--cell-in2:#a78bfa1f;--cell-halo:#5a46a63d;--cell-ink:#eee9ff;--kbd:#231a4cf2;--kbd-bg2:#161035f2;--kbd-bd:#7a68c09e;--kbd-ink:#f0ecff;--kbd-glow:#a78bfa36;--kbd2-bd:#9d7fc09e;--kbd2-glow:#c084fc3d;--key-press1:#a78bfaa3;--key-press2:#c084fc66;--banner-bg1:#f7f2fd;--banner-bg2:#ebe1f7;--banner-ink:#2d2146;--banner-bd:#b39dfc;--banner-glow1:#a78bfa96;--banner-glow2:#a78bfa54;--line1:#c4b5fdd9;--line2:#d9c8feeb;--line3:#8b5cf6cc;--line-sh1:#a78bfab3;--line-sh2:#a78bfa59;--tag:#7c3aed;--tag-ink:#ffffff;--tag1:#7c3aed;--tag2:#9d5cf0;--tag-glow1:#a78bfab3;--tag-glow2:#8b5cf659;--tag-deep:#5b21b655;--tag-txt-sh:#2f0a6e99;--chip-bg1:#231a4dd9;--chip-bg2:#161035d9;--chip-glow:#a78bfa26;--pc-ink:#c0b4e8;--dot-bg:#150f30;--dot-bd:#6a58b880;--dot-done1:#a78bfa;--dot-done2:#7c3aed;--dot-done-bd:#c4b5fd;--dot-cur-sh1:#a78bfa66;--dot-cur-sh2:#a78bfab3;--dot-cur-sh3:#a78bfa4d;--dot-cur-sh4:#a78bfad9;--halo1:#6a46c24d;--halo2:#8b5cf62b;--num-bg:#0f0a28e6;--num-c:#cdb9ff;--num-sh:#a78bfab3;--hl:#291c5c;--hl-bg1:#291c5cf5;--hl-bg2:#171040f5;--hl-bd:#a78bfacc;--hl-glow:#a78bfa45;--hl-cur:#bca6ff;--cur-bg1:#35267af8;--cur-bg2:#201456f8;--cur-glow:#a78bfab3;--ring-edge:#bca6ff;--ring-sh1:#bca6ffd9;--ring-sh2:#bca6ff73;--ring-in:#bca6ff66;--lt-bg1:#b39dfc;--lt-bg2:#6f3ad8;--lt-deep:#38148799;--lt-drop:#6f3ad866;--lt-glow:#a78bfa4d;--lt-ink:#f6f2ff;--lt-txt-sh:#25096bcc;--wprog-c:#b3a6e8;--soft-sh:#a78bfa33;--wbar-1:#7c3aed;--wbar-2:#a78bfa;--wbar-3:#c084fc;--wbar-glow:#a78bfa99;--wbar-glow2:#7c3aed59;--brand-sh1:#a78bfa8c;--brand-sh2:#8b5cf673;--brand-sub:#a79ad8;--acc-tsh:#a78bfa47;--btn-bg1:#8b5cf6;--btn-bg2:#6d28d9;--btn-glow1:#a78bfab3;--btn-glow2:#8b5cf666;--btn-txt-sh:#2f0a6e80;--btn-ink:#ffffff;--sheet-bg1:#191240f7;--sheet-bg2:#120b30f7;--sheet-glow:#a78bfa5c;--win-bd:#a78bfa80;--win-glow1:#a78bfa99;--win-glow2:#a78bfa54;--accent:#a78bfa;--accent-ink:#090614;--pa1:#a78bfaa8;--pa2:#8b5cf68f;--pa3:#a78bfa7d;--pa4:#fde68a63;--pa5:#a78bfa8c;--pa6:#8b5cf67a;--pa7:#a78bfa66;--pa8:#c4b5fd55;--pa9:#7c3aed63;--pa10:#8b5cf658}
+body.theme-3{--bg1:#0e0903;--bg2:#1a1206;--bgA:#3d2a0bd9;--bgB:#2415058c;--bgC:#2b1c0680;--ink:#fff9ec;--sub:#d9c391;--panel:#241a08f2;--panel-bd:#b08a3e80;--cell:#2a1e0af2;--cell-bg2:#171005f2;--cell-bd:#a07c3a80;--cell-in2:#fbbf241f;--cell-halo:#8a64293d;--cell-ink:#fdf6e3;--kbd:#33240cf2;--kbd-bg2:#211806f2;--kbd-bd:#b08a3e9e;--kbd-ink:#fdf8e8;--kbd-glow:#fbbf2436;--kbd2-bd:#c495559e;--kbd2-glow:#fcd34d3d;--key-press1:#fbbf24a3;--key-press2:#f59e0b66;--banner-bg1:#fdf6e3;--banner-bg2:#f3e8c8;--banner-ink:#3a2c0a;--banner-bd:#f5c542;--banner-glow1:#fbbf2496;--banner-glow2:#fbbf2454;--line1:#fde68ad9;--line2:#fef0b8eb;--line3:#f59e0bcc;--line-sh1:#fbbf24b3;--line-sh2:#fbbf2459;--tag:#d97706;--tag-ink:#241300;--tag1:#d97706;--tag2:#f5a623;--tag-glow1:#fbbf24b3;--tag-glow2:#f59e0b59;--tag-deep:#92400e55;--tag-txt-sh:#fff2cf4d;--chip-bg1:#33240cd9;--chip-bg2:#211806d9;--chip-glow:#fbbf2426;--pc-ink:#e0cba8;--dot-bg:#241a08;--dot-bd:#a07c3a80;--dot-done1:#fcd34d;--dot-done2:#d97706;--dot-done-bd:#fde68a;--dot-cur-sh1:#fbbf2466;--dot-cur-sh2:#fbbf24b3;--dot-cur-sh3:#fbbf244d;--dot-cur-sh4:#fbbf24d9;--halo1:#b07d1f4d;--halo2:#f59e0b2b;--num-bg:#171005e6;--num-c:#ffe9a8;--num-sh:#fbbf24b3;--hl:#4a340c;--hl-bg1:#4a340cf5;--hl-bg2:#2c1f06f5;--hl-bd:#fbbf24cc;--hl-glow:#fbbf2445;--hl-cur:#ffd76a;--cur-bg1:#5c4310f8;--cur-bg2:#3a2a06f8;--cur-glow:#fbbf24b3;--ring-edge:#ffd76a;--ring-sh1:#ffd76ad9;--ring-sh2:#ffd76a73;--ring-in:#ffd76a66;--lt-bg1:#fcd34d;--lt-bg2:#e08c0a;--lt-deep:#7a4a0599;--lt-drop:#b06e0666;--lt-glow:#fbbf244d;--lt-ink:#2d1c02;--lt-txt-sh:#ffe9b8b3;--wprog-c:#d9c391;--soft-sh:#fbbf2433;--wbar-1:#d97706;--wbar-2:#fbbf24;--wbar-3:#fde68a;--wbar-glow:#fbbf2499;--wbar-glow2:#d9770659;--brand-sh1:#fbbf248c;--brand-sh2:#f59e0b73;--brand-sub:#c2aa80;--acc-tsh:#fbbf2447;--btn-bg1:#f5a623;--btn-bg2:#d97706;--btn-glow1:#fbbf24b3;--btn-glow2:#fbbf2466;--btn-txt-sh:#fff0c080;--btn-ink:#2d1c02;--sheet-bg1:#2a1e0af7;--sheet-bg2:#1a1205f7;--sheet-glow:#fbbf245c;--win-bd:#fbbf2480;--win-glow1:#fbbf2499;--win-glow2:#fbbf2454;--accent:#fbbf24;--accent-ink:#0e0903;--pa1:#fbbf24a8;--pa2:#f59e0b8f;--pa3:#fbbf247d;--pa4:#38bdf863;--pa5:#fbbf248c;--pa6:#f59e0b7a;--pa7:#fbbf2466;--pa8:#fde68a55;--pa9:#d9770663;--pa10:#f59e0b58}
+body.theme-4{--bg1:#04111a;--bg2:#0a1e2c;--bgA:#0f3d54d9;--bgB:#0b3a3f8c;--bgC:#0a274080;--ink:#ecf7ff;--sub:#8fb6c9;--panel:#0a1c2af2;--panel-bd:#3e729080;--cell:#0d2233f2;--cell-bg2:#071523f2;--cell-bd:#35708f80;--cell-in2:#38bdf81f;--cell-halo:#1f6a8a3d;--cell-ink:#e8f6ff;--kbd:#10283af2;--kbd-bg2:#0a1c2af2;--kbd-bd:#3e72909e;--kbd-ink:#eef8ff;--kbd-glow:#38bdf836;--kbd2-bd:#3e8fa09e;--kbd2-glow:#22d3ee3d;--key-press1:#38bdf8a3;--key-press2:#22d3ee66;--banner-bg1:#f0faff;--banner-bg2:#d9edf7;--banner-ink:#0b2733;--banner-bd:#5bc8e8;--banner-glow1:#38bdf896;--banner-glow2:#38bdf854;--line1:#7dd3fcd9;--line2:#a5e3ffeb;--line3:#22d3eecc;--line-sh1:#38bdf8b3;--line-sh2:#38bdf859;--tag:#0ea5e9;--tag-ink:#ffffff;--tag1:#0e90c9;--tag2:#29b6e8;--tag-glow1:#38bdf8b3;--tag-glow2:#22d3ee59;--tag-deep:#07598555;--tag-txt-sh:#08324999;--chip-bg1:#10283ad9;--chip-bg2:#0a1c2ad9;--chip-glow:#38bdf826;--pc-ink:#b7d2e2;--dot-bg:#0a1c2a;--dot-bd:#35708f80;--dot-done1:#38bdf8;--dot-done2:#0ea5e9;--dot-done-bd:#7dd3fc;--dot-cur-sh1:#38bdf866;--dot-cur-sh2:#38bdf8b3;--dot-cur-sh3:#38bdf84d;--dot-cur-sh4:#38bdf8d9;--halo1:#1f6a8a4d;--halo2:#22d3ee2b;--num-bg:#071523e6;--num-c:#8fd8ff;--num-sh:#38bdf8b3;--hl:#0d3348;--hl-bg1:#0d3348f5;--hl-bg2:#082138f5;--hl-bd:#38bdf8cc;--hl-glow:#38bdf845;--hl-cur:#4fd4ff;--cur-bg1:#14506ef8;--cur-bg2:#0b3350f8;--cur-glow:#38bdf8b3;--ring-edge:#4fd4ff;--ring-sh1:#4fd4ffd9;--ring-sh2:#4fd4ff73;--ring-in:#4fd4ff66;--lt-bg1:#4fc9f2;--lt-bg2:#0e7fa8;--lt-deep:#07546e99;--lt-drop:#0e7fa866;--lt-glow:#38bdf84d;--lt-ink:#f2fbff;--lt-txt-sh:#052835cc;--wprog-c:#9dc0d4;--soft-sh:#38bdf833;--wbar-1:#0ea5e9;--wbar-2:#38bdf8;--wbar-3:#22d3ee;--wbar-glow:#38bdf899;--wbar-glow2:#0ea5e959;--brand-sh1:#38bdf88c;--brand-sh2:#0ea5e973;--brand-sub:#7fa8c2;--acc-tsh:#38bdf847;--btn-bg1:#29a8e0;--btn-bg2:#0e7fa8;--btn-glow1:#38bdf8b3;--btn-glow2:#38bdf866;--btn-txt-sh:#08324980;--btn-ink:#ffffff;--sheet-bg1:#0d2233f7;--sheet-bg2:#081725f7;--sheet-glow:#38bdf85c;--win-bd:#38bdf880;--win-glow1:#38bdf899;--win-glow2:#38bdf854;--accent:#38bdf8;--accent-ink:#04121a;--pa1:#38bdf8a8;--pa2:#22d3ee8f;--pa3:#38bdf87d;--pa4:#fde68a63;--pa5:#38bdf88c;--pa6:#22d3ee7a;--pa7:#38bdf866;--pa8:#7dd3fc55;--pa9:#0ea5e963;--pa10:#22d3ee58}
+body.theme-5{--bg1:#10051a;--bg2:#1c0a24;--bgA:#4a1466d9;--bgB:#2a0a3f8c;--bgC:#3a0c3380;--ink:#fdf2ff;--sub:#c49ade;--panel:#1c0f2af2;--panel-bd:#8a5cb880;--cell:#22102ef2;--cell-bg2:#140a1cf2;--cell-bd:#7a4aa880;--cell-in2:#e879f91f;--cell-halo:#6a2f963d;--cell-ink:#f8edff;--kbd:#2a1440f2;--kbd-bg2:#1a0c2cf2;--kbd-bd:#8a5cb89e;--kbd-ink:#f9f0ff;--kbd-glow:#e879f936;--kbd2-bd:#a86ac09e;--kbd2-glow:#c084fc3d;--key-press1:#e879f9a3;--key-press2:#c084fc66;--banner-bg1:#fdf4ff;--banner-bg2:#f2dcf5;--banner-ink:#3a1233;--banner-bd:#eb9dfa;--banner-glow1:#e879f996;--banner-glow2:#e879f954;--line1:#f0abfcd9;--line2:#f7cdfdeb;--line3:#c084fccc;--line-sh1:#e879f9b3;--line-sh2:#e879f959;--tag:#c026d3;--tag-ink:#ffffff;--tag1:#b01fac;--tag2:#d347c9;--tag-glow1:#e879f9b3;--tag-glow2:#c084fc59;--tag-deep:#86198f55;--tag-txt-sh:#4a0a4e99;--chip-bg1:#2a1440d9;--chip-bg2:#1a0c2cd9;--chip-glow:#e879f926;--pc-ink:#d4bce8;--dot-bg:#1c0f2a;--dot-bd:#7a4aa880;--dot-done1:#e879f9;--dot-done2:#b01fac;--dot-done-bd:#f0abfc;--dot-cur-sh1:#e879f966;--dot-cur-sh2:#e879f9b3;--dot-cur-sh3:#e879f94d;--dot-cur-sh4:#e879f9d9;--halo1:#9630c24d;--halo2:#c084fc2b;--num-bg:#140a1ce6;--num-c:#eeb0ff;--num-sh:#e879f9b3;--hl:#3c1250;--hl-bg1:#3c1250f5;--hl-bg2:#250b38f5;--hl-bd:#e879f9cc;--hl-glow:#e879f945;--hl-cur:#f096ff;--cur-bg1:#542074f8;--cur-bg2:#37114ef8;--cur-glow:#e879f9b3;--ring-edge:#f096ff;--ring-sh1:#f096ffd9;--ring-sh2:#f096ff73;--ring-in:#f096ff66;--lt-bg1:#f2a8ff;--lt-bg2:#9c23a8;--lt-deep:#5a0f6e99;--lt-drop:#9c23a866;--lt-glow:#e879f94d;--lt-ink:#fdf4ff;--lt-txt-sh:#43054dcc;--wprog-c:#cba6de;--soft-sh:#e879f933;--wbar-1:#b01fac;--wbar-2:#e879f9;--wbar-3:#c084fc;--wbar-glow:#e879f999;--wbar-glow2:#b01fac59;--brand-sh1:#e879f98c;--brand-sh2:#c084fc73;--brand-sub:#b890d8;--acc-tsh:#e879f947;--btn-bg1:#d347c9;--btn-bg2:#9c23a8;--btn-glow1:#e879f9b3;--btn-glow2:#e879f966;--btn-txt-sh:#4a0a4e80;--btn-ink:#ffffff;--sheet-bg1:#22102ef7;--sheet-bg2:#150a20f7;--sheet-glow:#e879f95c;--win-bd:#e879f980;--win-glow1:#e879f999;--win-glow2:#e879f954;--accent:#e879f9;--accent-ink:#10051a;--pa1:#e879f9a8;--pa2:#c084fc8f;--pa3:#e879f97d;--pa4:#fde68a63;--pa5:#e879f98c;--pa6:#c084fc7a;--pa7:#e879f966;--pa8:#f0abfc55;--pa9:#a855f763;--pa10:#c084fc58}
+body.theme-6{--bg1:#100804;--bg2:#1c1008;--bgA:#4a2410d9;--bgB:#2e12068c;--bgC:#3a1a0680;--ink:#fff5ec;--sub:#d4ab8c;--panel:#241408f2;--panel-bd:#a86a3e80;--cell:#2a180af2;--cell-bg2:#180d05f2;--cell-bd:#9a603880;--cell-in2:#fb923c1f;--cell-halo:#8a4f233d;--cell-ink:#fdf2e3;--kbd:#33200cf2;--kbd-bg2:#201407f2;--kbd-bd:#a86a3e9e;--kbd-ink:#fdf6ea;--kbd-glow:#fb923c36;--kbd2-bd:#c4854f9e;--kbd2-glow:#fdba743d;--key-press1:#fb923ca3;--key-press2:#f9731666;--banner-bg1:#fff6ee;--banner-bg2:#f5ddc8;--banner-ink:#3a2310;--banner-bd:#ffb066;--banner-glow1:#fb923c96;--banner-glow2:#fb923c54;--line1:#fdba74d9;--line2:#fed7a8eb;--line3:#f97316cc;--line-sh1:#fb923cb3;--line-sh2:#fb923c59;--tag:#c2540e;--tag-ink:#241300;--tag1:#c2540e;--tag2:#e07a24;--tag-glow1:#fb923cb3;--tag-glow2:#f9731659;--tag-deep:#9a341255;--tag-txt-sh:#fff2df4d;--chip-bg1:#33200cd9;--chip-bg2:#201407d9;--chip-glow:#fb923c26;--pc-ink:#e0c4ae;--dot-bg:#241408;--dot-bd:#9a603880;--dot-done1:#fdba74;--dot-done2:#c2540e;--dot-done-bd:#fed7aa;--dot-cur-sh1:#fb923c66;--dot-cur-sh2:#fb923cb3;--dot-cur-sh3:#fb923c4d;--dot-cur-sh4:#fb923cd9;--halo1:#a864204d;--halo2:#f973162b;--num-bg:#180d05e6;--num-c:#ffdda8;--num-sh:#fb923cb3;--hl:#46260c;--hl-bg1:#46260cf5;--hl-bg2:#2b1706f5;--hl-bd:#fb923ccc;--hl-glow:#fb923c45;--hl-cur:#ffb066;--cur-bg1:#5c3210f8;--cur-bg2:#3a1e08f8;--cur-glow:#fb923cb3;--ring-edge:#ffb066;--ring-sh1:#ffb066d9;--ring-sh2:#ffb06673;--ring-in:#ffb06666;--lt-bg1:#fdc08a;--lt-bg2:#d66a0e;--lt-deep:#7a3a0599;--lt-drop:#b35c0666;--lt-glow:#fb923c4d;--lt-ink:#2d1602;--lt-txt-sh:#ffe9cfb3;--wprog-c:#d4ab8c;--soft-sh:#fb923c33;--wbar-1:#c2540e;--wbar-2:#fb923c;--wbar-3:#fdba74;--wbar-glow:#fb923c99;--wbar-glow2:#c2540e59;--brand-sh1:#fb923c8c;--brand-sh2:#f9731673;--brand-sub:#c29a78;--acc-tsh:#fb923c47;--btn-bg1:#e07a24;--btn-bg2:#c2540e;--btn-glow1:#fb923cb3;--btn-glow2:#fb923c66;--btn-txt-sh:#fff2df80;--btn-ink:#241300;--sheet-bg1:#2a180af7;--sheet-bg2:#190d05f7;--sheet-glow:#fb923c5c;--win-bd:#fb923c80;--win-glow1:#fb923c99;--win-glow2:#fb923c54;--accent:#fb923c;--accent-ink:#100804;--pa1:#fb923ca8;--pa2:#f973168f;--pa3:#fb923c7d;--pa4:#38bdf863;--pa5:#fb923c8c;--pa6:#f973167a;--pa7:#fb923c66;--pa8:#fdba7455;--pa9:#ea580c63;--pa10:#f9731658}
+body.theme-7{--bg1:#080a1c;--bg2:#10122e;--bgA:#22275ed9;--bgB:#1417468c;--bgC:#1a1c4a80;--ink:#f2f4ff;--sub:#9ba3d8;--panel:#121430f2;--panel-bd:#5a60b880;--cell:#161a3ef2;--cell-bg2:#0c0e24f2;--cell-bd:#4e54a880;--cell-in2:#818cf81f;--cell-halo:#3a40963d;--cell-ink:#edf0ff;--kbd:#1c2048f2;--kbd-bg2:#121430f2;--kbd-bd:#5a60b89e;--kbd-ink:#f0f2ff;--kbd-glow:#818cf836;--kbd2-bd:#7a86c09e;--kbd2-glow:#a5b4fc3d;--key-press1:#818cf8a3;--key-press2:#a5b4fc66;--banner-bg1:#f5f7ff;--banner-bg2:#dee3f7;--banner-ink:#232849;--banner-bd:#9faaff;--banner-glow1:#818cf896;--banner-glow2:#818cf854;--line1:#c7d2fed9;--line2:#dfe4ffeb;--line3:#6366f1cc;--line-sh1:#818cf8b3;--line-sh2:#818cf859;--tag:#4f46e5;--tag-ink:#ffffff;--tag1:#4f46e5;--tag2:#6f66f0;--tag-glow1:#818cf8b3;--tag-glow2:#6366f159;--tag-deep:#3730a355;--tag-txt-sh:#1e1b6e99;--chip-bg1:#1c2048d9;--chip-bg2:#121430d9;--chip-glow:#818cf826;--pc-ink:#c2c8ea;--dot-bg:#121430;--dot-bd:#4e54a880;--dot-done1:#a5b4fc;--dot-done2:#4f46e5;--dot-done-bd:#c7d2fe;--dot-cur-sh1:#818cf866;--dot-cur-sh2:#818cf8b3;--dot-cur-sh3:#818cf84d;--dot-cur-sh4:#818cf8d9;--halo1:#42489e4d;--halo2:#6366f12b;--num-bg:#0c0e24e6;--num-c:#b6c0ff;--num-sh:#818cf8b3;--hl:#222650;--hl-bg1:#222650f5;--hl-bg2:#141636f5;--hl-bd:#818cf8cc;--hl-glow:#818cf845;--hl-cur:#a3b0ff;--cur-bg1:#323a7ef8;--cur-bg2:#202458f8;--cur-glow:#818cf8b3;--ring-edge:#a3b0ff;--ring-sh1:#a3b0ffd9;--ring-sh2:#a3b0ff73;--ring-in:#a3b0ff66;--lt-bg1:#a5b0fc;--lt-bg2:#4c4fd8;--lt-deep:#23268799;--lt-drop:#4c4fd866;--lt-glow:#818cf84d;--lt-ink:#f5f6ff;--lt-txt-sh:#191c56cc;--wprog-c:#a6aede;--soft-sh:#818cf833;--wbar-1:#4f46e5;--wbar-2:#818cf8;--wbar-3:#a5b4fc;--wbar-glow:#818cf899;--wbar-glow2:#4f46e559;--brand-sh1:#818cf88c;--brand-sh2:#6366f173;--brand-sub:#8f97c8;--acc-tsh:#818cf847;--btn-bg1:#6f66f0;--btn-bg2:#4c4fd8;--btn-glow1:#818cf8b3;--btn-glow2:#818cf866;--btn-txt-sh:#1e1b6e80;--btn-ink:#ffffff;--sheet-bg1:#161a3ef7;--sheet-bg2:#0e1028f7;--sheet-glow:#818cf85c;--win-bd:#818cf880;--win-glow1:#818cf899;--win-glow2:#818cf854;--accent:#818cf8;--accent-ink:#080a1c;--pa1:#818cf8a8;--pa2:#a5b4fc8f;--pa3:#818cf87d;--pa4:#fde68a63;--pa5:#818cf88c;--pa6:#a5b4fc7a;--pa7:#818cf866;--pa8:#c7d2fe55;--pa9:#6366f163;--pa10:#a5b4fc58}
+body.theme-8{--bg1:#12050c;--bg2:#1e0a18;--bgA:#521540d9;--bgB:#380f338c;--bgC:#45103080;--ink:#fff2f9;--sub:#d49ac2;--panel:#240e1cf2;--panel-bd:#a8558a80;--cell:#2a1224f2;--cell-bg2:#180a16f2;--cell-bd:#9a4a7a80;--cell-in2:#f272c81f;--cell-halo:#8a34623d;--cell-ink:#fbeef7;--kbd:#33172ef2;--kbd-bg2:#200f1cf2;--kbd-bd:#a8558a9e;--kbd-ink:#fdf0f8;--kbd-glow:#f272c836;--kbd2-bd:#c06a9e9e;--kbd2-glow:#f9a8d43d;--key-press1:#f272c8a3;--key-press2:#f9a8d466;--banner-bg1:#fdf4f9;--banner-bg2:#f5dcea;--banner-ink:#42122e;--banner-bd:#ffa3d8;--banner-glow1:#f272c896;--banner-glow2:#f272c854;--line1:#f9a8d4d9;--line2:#fcccebeb;--line3:#ec4899cc;--line-sh1:#f272c8b3;--line-sh2:#f272c859;--tag:#c2388b;--tag-ink:#ffffff;--tag1:#c2388b;--tag2:#dd55a5;--tag-glow1:#f272c8b3;--tag-glow2:#ec489959;--tag-deep:#9d174d55;--tag-txt-sh:#5e0a3399;--chip-bg1:#33172ed9;--chip-bg2:#200f1cd9;--chip-glow:#f272c826;--pc-ink:#e0bcd2;--dot-bg:#240e1c;--dot-bd:#9a4a7a80;--dot-done1:#f9a8d4;--dot-done2:#c2388b;--dot-done-bd:#fbcfe8;--dot-cur-sh1:#f272c866;--dot-cur-sh2:#f272c8b3;--dot-cur-sh3:#f272c84d;--dot-cur-sh4:#f272c8d9;--halo1:#a83a704d;--halo2:#ec48992b;--num-bg:#180a16e6;--num-c:#ffb8e2;--num-sh:#f272c8b3;--hl:#471532;--hl-bg1:#471532f5;--hl-bg2:#2b0c1ef5;--hl-bd:#f272c8cc;--hl-glow:#f272c845;--hl-cur:#ff9ad4;--cur-bg1:#5c2250f8;--cur-bg2:#3a1230f8;--cur-glow:#f272c8b3;--ring-edge:#ff9ad4;--ring-sh1:#ff9ad4d9;--ring-sh2:#ff9ad473;--ring-in:#ff9ad466;--lt-bg1:#fb9bd8;--lt-bg2:#b52f7e;--lt-deep:#6e0f4799;--lt-drop:#b52f7e66;--lt-glow:#f272c84d;--lt-ink:#fff0f8;--lt-txt-sh:#520835cc;--wprog-c:#d6a0c4;--soft-sh:#f272c833;--wbar-1:#c2388b;--wbar-2:#f272c8;--wbar-3:#f9a8d4;--wbar-glow:#f272c899;--wbar-glow2:#c2388b59;--brand-sh1:#f272c88c;--brand-sh2:#ec489973;--brand-sub:#c98cae;--acc-tsh:#f272c847;--btn-bg1:#dd55a5;--btn-bg2:#b52f7e;--btn-glow1:#f272c8b3;--btn-glow2:#f272c866;--btn-txt-sh:#5e0a3380;--btn-ink:#ffffff;--sheet-bg1:#2a1224f7;--sheet-bg2:#190b17f7;--sheet-glow:#f272c85c;--win-bd:#f272c880;--win-glow1:#f272c899;--win-glow2:#f272c854;--accent:#f272c8;--accent-ink:#12050c;--pa1:#f272c8a8;--pa2:#f9a8d48f;--pa3:#f272c87d;--pa4:#fde68a63;--pa5:#f272c88c;--pa6:#f9a8d47a;--pa7:#f272c866;--pa8:#fbcfe855;--pa9:#ec489963;--pa10:#f9a8d458}
+body.theme-9{--bg1:#070a12;--bg2:#131824;--bgA:#2e3550d9;--bgB:#1e22388c;--bgC:#232a4280;--ink:#f4f7ff;--sub:#a8b4cf;--panel:#141a28f2;--panel-bd:#6a78a080;--cell:#181f30f2;--cell-bg2:#0d121ef2;--cell-bd:#5a688f80;--cell-in2:#c9d8f71f;--cell-halo:#46527a3d;--cell-ink:#eef2fb;--kbd:#1e2638f2;--kbd-bg2:#131928f2;--kbd-bd:#6a78a09e;--kbd-ink:#f2f5fd;--kbd-glow:#c9d8f736;--kbd2-bd:#8a96b89e;--kbd2-glow:#a5b4fc3d;--key-press1:#c9d8f7a3;--key-press2:#a5b4fc66;--banner-bg1:#f1f5fb;--banner-bg2:#d9e0ec;--banner-ink:#1c2534;--banner-bd:#b6c8ef;--banner-glow1:#c9d8f796;--banner-glow2:#c9d8f754;--line1:#dbe6ffd9;--line2:#e0e9ffeb;--line3:#93c5fdcc;--line-sh1:#c9d8f7b3;--line-sh2:#c9d8f759;--tag:#5273a8;--tag-ink:#ffffff;--tag1:#5273a8;--tag2:#6f94cd;--tag-glow1:#c9d8f7b3;--tag-glow2:#93c5fd59;--tag-deep:#2e447055;--tag-txt-sh:#16233a99;--chip-bg1:#1e2638d9;--chip-bg2:#131928d9;--chip-glow:#c9d8f726;--pc-ink:#c6d2e8;--dot-bg:#141a28;--dot-bd:#5a688f80;--dot-done1:#c9d8f7;--dot-done2:#7fa3d8;--dot-done-bd:#d6e2f8;--dot-cur-sh1:#c9d8f766;--dot-cur-sh2:#c9d8f7b3;--dot-cur-sh3:#c9d8f74d;--dot-cur-sh4:#c9d8f7d9;--halo1:#55608c4d;--halo2:#93c5fd2b;--num-bg:#0d121ee6;--num-c:#d5e2ff;--num-sh:#c9d8f7b3;--hl:#27304a;--hl-bg1:#27304af5;--hl-bg2:#161d30f5;--hl-bd:#c9d8f7cc;--hl-glow:#c9d8f745;--hl-cur:#d6e3ff;--cur-bg1:#3a4668f8;--cur-bg2:#242e4af8;--cur-glow:#c9d8f7b3;--ring-edge:#d6e3ff;--ring-sh1:#d6e3ffd9;--ring-sh2:#d6e3ff73;--ring-in:#d6e3ff66;--lt-bg1:#e4ebf8;--lt-bg2:#9fb4dc;--lt-deep:#4a5a8099;--lt-drop:#7a90c066;--lt-glow:#c9d8f74d;--lt-ink:#1a2338;--lt-txt-sh:#ffffffb3;--wprog-c:#b0bcd8;--soft-sh:#c9d8f733;--wbar-1:#7fa3d8;--wbar-2:#c9d8f7;--wbar-3:#d6e2f8;--wbar-glow:#c9d8f799;--wbar-glow2:#7fa3d859;--brand-sh1:#c9d8f78c;--brand-sh2:#93c5fd73;--brand-sub:#93a2c2;--acc-tsh:#c9d8f747;--btn-bg1:#8fa8d8;--btn-bg2:#5a78ad;--btn-glow1:#c9d8f7b3;--btn-glow2:#c9d8f766;--btn-txt-sh:#16233a80;--btn-ink:#0e1526;--sheet-bg1:#181f30f7;--sheet-bg2:#0f1422f7;--sheet-glow:#c9d8f75c;--win-bd:#c9d8f780;--win-glow1:#c9d8f799;--win-glow2:#c9d8f754;--accent:#c9d8f7;--accent-ink:#070a12;--pa1:#c9d8f7a8;--pa2:#e2e8f08f;--pa3:#c9d8f77d;--pa4:#fde68a63;--pa5:#c9d8f78c;--pa6:#e2e8f07a;--pa7:#c9d8f766;--pa8:#93c5fd55;--pa9:#a5b4fc63;--pa10:#e2e8f058}
+body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:#2c0e4280;--ink:#faf5ff;--sub:#bd9ade;--panel:#1c1030f2;--panel-bd:#8a5fc080;--cell:#221438f2;--cell-bg2:#140a24f2;--cell-bd:#7a52a880;--cell-in2:#c084fc1f;--cell-halo:#6a3f9a3d;--cell-ink:#f4ecff;--kbd:#2a1a42f2;--kbd-bg2:#1a0e2ef2;--kbd-bd:#8a5fc09e;--kbd-ink:#f8f2ff;--kbd-glow:#c084fc36;--kbd2-bd:#a877cf9e;--kbd2-glow:#d8b4fe3d;--key-press1:#c084fca3;--key-press2:#d8b4fe66;--banner-bg1:#faf5ff;--banner-bg2:#eddcfa;--banner-ink:#37214a;--banner-bd:#cfa4ff;--banner-glow1:#c084fc96;--banner-glow2:#c084fc54;--line1:#d8b4fed9;--line2:#ead4ffeb;--line3:#a855f7cc;--line-sh1:#c084fcb3;--line-sh2:#c084fc59;--tag:#9333ea;--tag-ink:#ffffff;--tag1:#9333ea;--tag2:#ad5cf0;--tag-glow1:#c084fcb3;--tag-glow2:#a855f759;--tag-deep:#6b21a855;--tag-txt-sh:#420a7799;--chip-bg1:#2a1a42d9;--chip-bg2:#1a0e2ed9;--chip-glow:#c084fc26;--pc-ink:#d2bce8;--dot-bg:#1c1030;--dot-bd:#7a52a880;--dot-done1:#d8b4fe;--dot-done2:#9333ea;--dot-done-bd:#e9d5ff;--dot-cur-sh1:#c084fc66;--dot-cur-sh2:#c084fcb3;--dot-cur-sh3:#c084fc4d;--dot-cur-sh4:#c084fcd9;--halo1:#8a4fc24d;--halo2:#a855f72b;--num-bg:#140a24e6;--num-c:#dcb0ff;--num-sh:#c084fcb3;--hl:#351a58;--hl-bg1:#351a58f5;--hl-bg2:#22103af5;--hl-bd:#c084fccc;--hl-glow:#c084fc45;--hl-cur:#d7a4ff;--cur-bg1:#4b2a78f8;--cur-bg2:#301a52f8;--cur-glow:#c084fcb3;--ring-edge:#d7a4ff;--ring-sh1:#d7a4ffd9;--ring-sh2:#d7a4ff73;--ring-in:#d7a4ff66;--lt-bg1:#d0a3fc;--lt-bg2:#7c2fd0;--lt-deep:#43118f99;--lt-drop:#7c2fd066;--lt-glow:#c084fc4d;--lt-ink:#faf5ff;--lt-txt-sh:#350a70cc;--wprog-c:#c4a6de;--soft-sh:#c084fc33;--wbar-1:#9333ea;--wbar-2:#c084fc;--wbar-3:#d8b4fe;--wbar-glow:#c084fc99;--wbar-glow2:#9333ea59;--brand-sh1:#c084fc8c;--brand-sh2:#a855f773;--brand-sub:#a986cc;--acc-tsh:#c084fc47;--btn-bg1:#ad5cf0;--btn-bg2:#7c2fd0;--btn-glow1:#c084fcb3;--btn-glow2:#c084fc66;--btn-txt-sh:#420a7780;--btn-ink:#ffffff;--sheet-bg1:#221438f7;--sheet-bg2:#150a26f7;--sheet-glow:#c084fc5c;--win-bd:#c084fc80;--win-glow1:#c084fc99;--win-glow2:#c084fc54;--accent:#c084fc;--accent-ink:#0d0517;--pa1:#c084fca8;--pa2:#e9d5ff8f;--pa3:#c084fc7d;--pa4:#fde68a63;--pa5:#c084fc8c;--pa6:#e9d5ff7a;--pa7:#c084fc66;--pa8:#d8b4fe55;--pa9:#a855f763;--pa10:#e9d5ff58}
+
 
 /* deep-space canvas: layered gradients + drifting neon particles + faint
    twinkling stars — ALL pure CSS, zero images, transform-only animation */
 #bg{background:
-  radial-gradient(120% 80% at 50% -10%,#14245cd9 0%,transparent 55%),
-  radial-gradient(90% 60% at 88% 112%,#23144d8c 0%,transparent 62%),
-  radial-gradient(70% 50% at 10% 106%,#0a2b4a80 0%,transparent 58%),
+  radial-gradient(120% 80% at 50% -10%,var(--bgA) 0%,transparent 55%),
+  radial-gradient(90% 60% at 88% 112%,var(--bgB) 0%,transparent 62%),
+  radial-gradient(70% 50% at 10% 106%,var(--bgC) 0%,transparent 58%),
   linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 74%)}
 #bg::before{content:"";position:absolute;inset:-42%;background-image:
-  radial-gradient(2.5px 2.5px at 12% 22%,#4cc9f0a8 50%,transparent 51%),
-  radial-gradient(2px 2px at 28% 68%,#8b5cf68f 50%,transparent 51%),
-  radial-gradient(2px 2px at 44% 12%,#4cc9f07d 50%,transparent 51%),
-  radial-gradient(2.5px 2.5px at 62% 82%,#f472b663 50%,transparent 51%),
-  radial-gradient(2px 2px at 78% 35%,#4cc9f08c 50%,transparent 51%),
-  radial-gradient(1.8px 1.8px at 90% 60%,#8b5cf67a 50%,transparent 51%),
-  radial-gradient(2px 2px at 8% 85%,#4cc9f066 50%,transparent 51%),
-  radial-gradient(1.8px 1.8px at 55% 48%,#7dd3fc55 50%,transparent 51%),
-  radial-gradient(2.2px 2.2px at 34% 40%,#38bdf863 50%,transparent 51%),
-  radial-gradient(2px 2px at 70% 8%,#a78bfa58 50%,transparent 51%);
+  radial-gradient(2.5px 2.5px at 12% 22%,var(--pa1) 50%,transparent 51%),
+  radial-gradient(2px 2px at 28% 68%,var(--pa2) 50%,transparent 51%),
+  radial-gradient(2px 2px at 44% 12%,var(--pa3) 50%,transparent 51%),
+  radial-gradient(2.5px 2.5px at 62% 82%,var(--pa4) 50%,transparent 51%),
+  radial-gradient(2px 2px at 78% 35%,var(--pa5) 50%,transparent 51%),
+  radial-gradient(1.8px 1.8px at 90% 60%,var(--pa6) 50%,transparent 51%),
+  radial-gradient(2px 2px at 8% 85%,var(--pa7) 50%,transparent 51%),
+  radial-gradient(1.8px 1.8px at 55% 48%,var(--pa8) 50%,transparent 51%),
+  radial-gradient(2.2px 2.2px at 34% 40%,var(--pa9) 50%,transparent 51%),
+  radial-gradient(2px 2px at 70% 8%,var(--pa10) 50%,transparent 51%);
   animation:drift 46s ease-in-out infinite alternate}
 @keyframes drift{from{transform:translate3d(-3%,-2%,0) scale(1.03)}to{transform:translate3d(3%,2.5%,0) scale(1.07)}}
 #bg::after{content:"";position:absolute;inset:0;background-image:
@@ -96,15 +108,15 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 .logo-mark i:nth-child(2){background:linear-gradient(135deg,#8b5cf6,#6366f1);box-shadow:0 0 6px #8b5cf6a8}
 .logo-mark i:nth-child(3){background:linear-gradient(135deg,#f472b6,#8b5cf6);box-shadow:0 0 6px #f472b68c}
 .logo-mark i:nth-child(4){background:linear-gradient(135deg,#38bdf8,#22d3ee);box-shadow:0 0 6px #38bdf8a8}
-.brand-title{font-size:1.18rem;font-weight:900;color:#f2f7ff;line-height:1.08;text-shadow:0 0 10px #4cc9ff8c,0 0 28px #3b82f673}
-.brand-sub{font-size:.55rem;letter-spacing:.34em;color:#7f9cd8;font-weight:700;direction:ltr;text-shadow:0 0 8px #45c8ff33;line-height:1.1}
+.brand-title{font-size:1.18rem;font-weight:900;color:#f2f7ff;line-height:1.08;text-shadow:0 0 10px var(--brand-sh1),0 0 28px var(--brand-sh2)}
+.brand-sub{font-size:.55rem;letter-spacing:.34em;color:var(--brand-sub);font-weight:700;direction:ltr;text-shadow:0 0 8px var(--soft-sh);line-height:1.1}
 
 /* ---- clue banner: ivory-champagne glass panel with neon blue lines ---- */
-.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,#f9f3e2 0%,#efe5cb 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;position:relative;box-shadow:0 0 22px -3px #45c8ff96,0 0 42px -10px #45c8ff54,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59,inset 0 0 16px #ffffff3d;transition:box-shadow .3s}
+.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,var(--banner-bg1) 0%,var(--banner-bg2) 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;position:relative;box-shadow:0 0 22px -3px var(--banner-glow1),0 0 42px -10px var(--banner-glow2),0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59,inset 0 0 16px #ffffff3d;transition:box-shadow .3s}
 /* neon light-line under the panel's top edge — pure CSS glow accent */
-.clue-banner::before{content:"";position:absolute;left:12px;right:12px;top:3px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent 0%,#5bc8ffd9 16%,#7cc4ffeb 50%,#8b5cf6cc 84%,transparent 100%);box-shadow:0 0 10px #45c8ffb3,0 0 20px #45c8ff59;pointer-events:none}
+.clue-banner::before{content:"";position:absolute;left:12px;right:12px;top:3px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent 0%,var(--line1) 16%,var(--line2) 50%,var(--line3) 84%,transparent 100%);box-shadow:0 0 10px var(--line-sh1),0 0 20px var(--line-sh2);pointer-events:none}
 .clue-banner.shake{box-shadow:0 0 22px -3px #f472b6b3,0 0 42px -10px #f472b666,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 16px #ffffff3d}
-.clue-tag{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:linear-gradient(165deg,#1273d6 0%,#219ee8 100%);color:var(--tag-ink);font-weight:900;font-size:.95rem;padding:5px 12px;border-radius:12px;white-space:nowrap;box-shadow:0 0 16px #38bdf8b3,0 0 32px #219ee859,inset 0 1px 0 #ffffff55,inset 0 -2px 0 #0c5aa455;text-shadow:0 1px 1px #0a3f6699}
+.clue-tag{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:linear-gradient(165deg,var(--tag1) 0%,var(--tag2) 100%);color:var(--tag-ink);font-weight:900;font-size:.95rem;padding:5px 12px;border-radius:12px;white-space:nowrap;box-shadow:0 0 16px var(--tag-glow1),0 0 32px var(--tag-glow2),inset 0 1px 0 #ffffff55,inset 0 -2px 0 var(--tag-deep);text-shadow:0 1px 1px var(--tag-txt-sh)}
 .clue-tag .dir-ic{width:17px;height:9px;flex:0 0 auto;filter:drop-shadow(0 1px 1px #0a3f6666)}
 .clue-tag .dir-ic path{stroke:currentColor}
 .clue-text{flex:1;min-width:0;font-size:18px;font-weight:800;line-height:1.55;color:var(--banner-ink);word-break:break-word;max-height:56px;overflow-y:auto;overflow-x:hidden}
@@ -115,20 +127,20 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 
 /* ---- slim status row (menu + level + dots) ---- */
 .status-row{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:30px;padding:0 2px}
-.menu-btn{width:32px;height:32px;border-radius:10px;background:linear-gradient(180deg,#16294fd9,#0e1c3cd9);border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1rem;font-weight:800;color:var(--ink);box-shadow:inset 0 1px 0 #ffffff17,0 0 10px #45c8ff26;transition:transform .15s}
+.menu-btn{width:32px;height:32px;border-radius:10px;background:linear-gradient(180deg,var(--chip-bg1),var(--chip-bg2));border:1px solid var(--panel-bd);display:grid;place-items:center;font-size:1rem;font-weight:800;color:var(--ink);box-shadow:inset 0 1px 0 #ffffff17,0 0 10px var(--chip-glow);transition:transform .15s}
 .menu-btn:active{transform:scale(.88)}
-.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 0 12px #45c8ff47}
+.lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 0 12px var(--acc-tsh)}
 .dots{flex:1;display:flex;gap:4px;justify-content:flex-start;overflow:hidden}
-.dot{width:8px;height:8px;border-radius:50%;background:#0d1c3e;border:1px solid #3d6db880;box-shadow:inset 0 1px 2px #0009;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
-.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px #45c8ff66,0 0 12px #45c8ffb3;animation:dotPulse 2.6s ease-in-out infinite}
-@keyframes dotPulse{50%{box-shadow:0 0 0 4px #45c8ff4d,0 0 16px #45c8ffd9}}
-.dot.done{background:linear-gradient(180deg,#4cc9f0,#2563eb);border-color:#7dd3fc;box-shadow:0 0 11px #45c8ffb3}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dot-bg);border:1px solid var(--dot-bd);box-shadow:inset 0 1px 2px #0009;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
+.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px var(--dot-cur-sh1),0 0 12px var(--dot-cur-sh2);animation:dotPulse 2.6s ease-in-out infinite}
+@keyframes dotPulse{50%{box-shadow:0 0 0 4px var(--dot-cur-sh3),0 0 16px var(--dot-cur-sh4)}}
+.dot.done{background:linear-gradient(180deg,var(--dot-done1),var(--dot-done2));border-color:var(--dot-done-bd);box-shadow:0 0 11px var(--dot-cur-sh2)}
 .dot.lock{opacity:.35;cursor:default}
 .dot.just-unlocked{animation:dotUnlock .7s cubic-bezier(.34,1.56,.64,1)}
 @keyframes dotUnlock{40%{transform:scale(2)}}
 
 /* ---- player count chip (lives in the header) ---- */
-.pcount{flex:0 0 auto;font-size:.72rem;font-weight:800;color:#bcd0f5;white-space:nowrap;padding:3px 10px;background:linear-gradient(180deg,#13234acc,#0d1c3ecc);border:1px solid #3d6db873;border-radius:999px;line-height:1.25;box-shadow:inset 0 1px 0 #ffffff14,0 0 10px #45c8ff1f;opacity:0;animation:appIn .5s ease .3s forwards}
+.pcount{flex:0 0 auto;font-size:.72rem;font-weight:800;color:var(--pc-ink);white-space:nowrap;padding:3px 10px;background:linear-gradient(180deg,var(--chip-bg1),var(--chip-bg2));border:1px solid var(--dot-bd);border-radius:999px;line-height:1.25;box-shadow:inset 0 1px 0 #ffffff14,0 0 10px var(--chip-glow);opacity:0;animation:appIn .5s ease .3s forwards}
 
 /* ---- grid: the visual focal point (soft blue halo behind, zero layout cost) ----
    "safe center": if the grid ever overflows the zone, it anchors to the TOP
@@ -136,26 +148,26 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
    never disappear under the status bar. Older engines ignore the unsafe
    value and keep the plain center above. */
 .grid-zone{flex:1 1 auto;display:grid;justify-content:center;align-content:center;min-height:0;overflow:hidden;position:relative;align-content:safe center;justify-content:safe center}
-.grid-zone::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,470px);aspect-ratio:1/1;background:radial-gradient(50% 50% at 50% 50%,#2f6db94d 0%,#8b5cf62b 45%,transparent 72%);pointer-events:none;animation:haloPulse 7s ease-in-out infinite alternate}
+.grid-zone::before{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(94vw,470px);aspect-ratio:1/1;background:radial-gradient(50% 50% at 50% 50%,var(--halo1) 0%,var(--halo2) 45%,transparent 72%);pointer-events:none;animation:haloPulse 7s ease-in-out infinite alternate}
 @keyframes haloPulse{from{opacity:.68}to{opacity:1}}
 .grid-wrap{display:grid;grid-template-columns:repeat(8,var(--csz));grid-auto-rows:auto;gap:var(--gap);perspective:700px;position:relative}
 /* classic crossword corner number — small chip at the top-right of each word's START cell */
-.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:#0a1428e6;font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:#7fd4ff;pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2;text-shadow:0 0 8px #45c8ffb3}
-.num.on{color:#ffffff;background:linear-gradient(165deg,#1273d6,#219ee8);font-weight:900;transform:scale(1.18);box-shadow:0 0 10px #38bdf8b3}
+.num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:var(--num-bg);font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:var(--num-c);pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2;text-shadow:0 0 8px var(--num-sh)}
+.num.on{color:var(--tag-ink);background:linear-gradient(165deg,var(--tag1),var(--tag2));font-weight:900;transform:scale(1.18);box-shadow:0 0 10px var(--tag-glow1)}
 /* empty cells = dark glass tiles, slightly recessed, glowing edges */
-.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,#101d3af2 0%,#0a1428f2 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 #4cc9f01f,0 0 8px #2f6db93d;transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
+.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,var(--cell) 0%,var(--cell-bg2) 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 var(--cell-in2),0 0 8px var(--cell-halo);transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
 /* blocked cells = matte grey-blue blocks, NO glow — clearly different from the glowing sockets */
 .cell.void{background:#1a2542;border-color:#26325acc;box-shadow:inset 0 1px 3px #00000080;cursor:default}
 /* active word = electric-blue wash over the dark glass */
-.cell.hl{background:linear-gradient(180deg,#153a6bf5 0%,#0d1f42f5 100%);border-color:#4cc9f0cc;box-shadow:inset 0 2px 6px #0009,0 0 8px #45c8ff45}
+.cell.hl{background:linear-gradient(180deg,var(--hl-bg1) 0%,var(--hl-bg2) 100%);border-color:var(--hl-bd);box-shadow:inset 0 2px 6px #0009,0 0 8px var(--hl-glow)}
 /* selected cell = animated bright blue ring + soft glow */
-.cell.cur{background:linear-gradient(180deg,#1a4a80f8 0%,#10294ef8 100%);border-color:#45c8ff;box-shadow:inset 0 2px 6px #0009,0 0 18px #45c8ffb3}
-.cell.cur::after{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid #45c8ff;box-shadow:0 0 16px #45c8ffd9,0 0 32px #45c8ff73,inset 0 0 10px #45c8ff66;animation:curGlow 1.6s ease-in-out infinite;pointer-events:none;z-index:3}
+.cell.cur{background:linear-gradient(180deg,var(--cur-bg1) 0%,var(--cur-bg2) 100%);border-color:var(--hl-cur);box-shadow:inset 0 2px 6px #0009,0 0 18px var(--cur-glow)}
+.cell.cur::after{content:"";position:absolute;inset:-2px;border-radius:8px;border:2px solid var(--ring-edge);box-shadow:0 0 16px var(--ring-sh1),0 0 32px var(--ring-sh2),inset 0 0 10px var(--ring-in);animation:curGlow 1.6s ease-in-out infinite;pointer-events:none;z-index:3}
 @keyframes curGlow{50%{opacity:.42}}
 .cell.origin::before{content:"";position:absolute;top:2px;right:2px;width:0;height:0;border-top:7px solid var(--hl-cur);border-left:7px solid transparent;opacity:.9;pointer-events:none;z-index:2}
 /* typed letter = ELECTRIC-BLUE glass tile (NOT green — green is reserved
    for letters proven correct when a word locks; blue = unverified guess) */
-.cell .lt{position:absolute;inset:2px;display:grid;place-items:center;border-radius:5px;background:linear-gradient(180deg,#37a4f5 0%,#1d63d8 100%);box-shadow:inset 0 1px 0 #ffffff4d,inset 0 -3px 5px #0a2a6e99,0 2px 6px -1px #1d63d866,0 0 12px #45c8ff4d;color:#f4faff;text-shadow:0 1px 2px #062042cc;pointer-events:none}
+.cell .lt{position:absolute;inset:2px;display:grid;place-items:center;border-radius:5px;background:linear-gradient(180deg,var(--lt-bg1) 0%,var(--lt-bg2) 100%);box-shadow:inset 0 1px 0 #ffffff4d,inset 0 -3px 5px var(--lt-deep),0 2px 6px -1px var(--lt-drop),0 0 12px var(--lt-glow);color:var(--lt-ink);text-shadow:0 1px 2px var(--lt-txt-sh);pointer-events:none}
 .cell .lt:empty{display:none}
 /* wrong letter (word completely filled and incorrect) = rose-red neon glass
    so it is unmistakable WHICH cells must be fixed — never green */
@@ -179,9 +191,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes sweep{from{transform:translateX(120%)}to{transform:translateX(-120%)}}
 
 /* ---- word progress (below the grid) ---- */
-.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:#9db4e8;min-height:18px;text-shadow:0 0 8px #45c8ff33}
-.wbar{flex:1;height:6px;border-radius:99px;background:#0d1c3e;border:1px solid #3d6db866;overflow:hidden;box-shadow:inset 0 1px 3px #0008}
-.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#2563eb,#4cc9f0 45%,#8b5cf6);box-shadow:0 0 10px #4cc9f099,0 0 20px #2563eb59;transition:width .5s cubic-bezier(.2,.8,.3,1)}
+.wprog{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 6px;font-size:.78rem;font-weight:700;color:var(--wprog-c);min-height:18px;text-shadow:0 0 8px var(--soft-sh)}
+.wbar{flex:1;height:6px;border-radius:99px;background:var(--dot-bg);border:1px solid var(--dot-bd);overflow:hidden;box-shadow:inset 0 1px 3px #0008}
+.wbar i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--wbar-1),var(--wbar-2) 45%,var(--wbar-3));box-shadow:0 0 10px var(--wbar-glow),0 0 20px var(--wbar-glow2);transition:width .5s cubic-bezier(.2,.8,.3,1)}
 
 /* ---- keyboard — the user's STANDARD layout, unchanged (2026-10-08 v3):
    LEFT-TO-RIGHT 3-row 11 + 11 + 10 letters + wide ⌫ at the FAR RIGHT of the
@@ -193,11 +205,11 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
    light and chic pressed states (letters/order/⌫ position untouched). ---- */
 .kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 0;direction:ltr}
 .krow{display:flex;gap:5px;justify-content:center}
-.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,#1b2c55f2 0%,#131f40f2 100%);border:1px solid #4668b89e;border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px #45c8ff36;transition:transform .09s,filter .09s,box-shadow .09s;cursor:pointer}
+.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,var(--kbd) 0%,var(--kbd-bg2) 100%);border:1px solid var(--kbd-bd);border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px var(--kbd-glow);transition:transform .09s,filter .09s,box-shadow .09s;cursor:pointer}
 /* middle row gets the violet edge light (subtle blue/violet alternation) */
-.krow:nth-child(2) .key{border-color:#6d5fc09e;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px #8b5cf63d}
-.key:active,.key.pressed{transform:scale(.9);filter:brightness(1.28);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 18px #45c8ffa3,0 0 7px #8b5cf666}
-.key::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid #45c8ff;opacity:0;transform:scale(.82);pointer-events:none}
+.krow:nth-child(2) .key{border-color:var(--kbd2-bd);box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px var(--kbd2-glow)}
+.key:active,.key.pressed{transform:scale(.9);filter:brightness(1.28);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 18px var(--key-press1),0 0 7px var(--key-press2)}
+.key::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid var(--accent);opacity:0;transform:scale(.82);pointer-events:none}
 .key.pressed::after{animation:halo .34s ease-out}
 @keyframes halo{from{opacity:.75;transform:scale(.82)}to{opacity:0;transform:scale(1.12)}}
 /* wide icon-only backspace at the END of the bottom row — FAR RIGHT in the
@@ -226,9 +238,9 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 @keyframes logoFloat{50%{transform:translateY(-9px) rotate(-4deg)}}
 .screen h2{font-size:1.5rem;font-weight:800}
 .screen p{font-size:.95rem;line-height:1.9;color:var(--sub);font-weight:600;max-width:330px}
-.btn{background:linear-gradient(165deg,#2ea3f0 0%,#1f7fe0 100%);color:#ffffff;font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 0 20px -2px #45c8ffb3,0 0 42px -8px #45c8ff66,0 6px 16px -6px #0008,inset 0 1px 0 #ffffff4d;text-shadow:0 1px 1px #0a3f6680;transition:transform .15s,filter .15s;min-width:240px}
+.btn{background:linear-gradient(165deg,var(--btn-bg1) 0%,var(--btn-bg2) 100%);color:var(--btn-ink);font-weight:800;font-size:1rem;padding:13px 22px;border-radius:14px;box-shadow:0 0 20px -2px var(--btn-glow1),0 0 42px -8px var(--btn-glow2),0 6px 16px -6px #0008,inset 0 1px 0 #ffffff4d;text-shadow:0 1px 1px var(--btn-txt-sh);transition:transform .15s,filter .15s;min-width:240px}
 .btn:active{transform:scale(.95)}
-.btn.ghost{background:linear-gradient(180deg,#16294fd9,#0e1c3cd9);color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:inset 0 1px 0 #ffffff17,0 0 12px #45c8ff2b;text-shadow:none}
+.btn.ghost{background:linear-gradient(180deg,var(--chip-bg1),var(--chip-bg2));color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:inset 0 1px 0 #ffffff17,0 0 12px var(--chip-glow);text-shadow:none}
 .btn.busy{pointer-events:none;filter:saturate(.6) brightness(.9)}
 .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--panel-bd);border-top-color:var(--accent);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -238,7 +250,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 #sheet[hidden]{display:none}
 #sheet .scrim{position:absolute;inset:0;background:#00000073;animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0}}
-#sheet .card{position:relative;width:min(430px,100%);background:linear-gradient(180deg,#101d3af7 0%,#0b1530f7 100%);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px -8px #000c,0 0 26px -6px #45c8ff5c;animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
+#sheet .card{position:relative;width:min(430px,100%);background:linear-gradient(180deg,var(--sheet-bg1) 0%,var(--sheet-bg2) 100%);border:1.5px solid var(--panel-bd);border-radius:22px 22px 0 0;padding:14px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -6px 30px -8px #000c,0 0 26px -6px var(--sheet-glow);animation:sheetUp .3s cubic-bezier(.2,.9,.3,1.05)}
 @keyframes sheetUp{from{transform:translateY(60%);opacity:.4}}
 #sheet .grab{width:44px;height:5px;border-radius:9px;background:var(--panel-bd);margin:0 auto 12px}
 #sheet h3{font-size:1.05rem;font-weight:800;margin-bottom:10px}
@@ -256,7 +268,7 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
 /* ================= win overlay + confetti ================= */
 #win{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;background:#000000a6}
 #win[hidden]{display:none}
-#win .card{width:min(360px,88vw);background:linear-gradient(180deg,#101d3af9 0%,#0b1530f9 100%);border:1.5px solid #4cc9f080;border-radius:24px;padding:30px 24px;text-align:center;box-shadow:0 0 34px -6px #45c8ff99,0 0 60px -12px #45c8ff54,0 20px 50px -12px #000d,inset 0 1px 0 #ffffff1f;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
+#win .card{width:min(360px,88vw);background:linear-gradient(180deg,var(--sheet-bg1) 0%,var(--sheet-bg2) 100%);border:1.5px solid var(--win-bd);border-radius:24px;padding:30px 24px;text-align:center;box-shadow:0 0 34px -6px var(--win-glow1),0 0 60px -12px var(--win-glow2),0 20px 50px -12px #000d,inset 0 1px 0 #ffffff1f;animation:winIn .5s cubic-bezier(.2,1.2,.3,1)}
 @keyframes winIn{from{transform:scale(.55) translateY(30px);opacity:0}}
 #win .big{font-size:3.2rem;animation:logoFloat 2.6s ease-in-out infinite}
 #win h2{font-size:1.45rem;font-weight:900;margin:6px 0 4px}
@@ -373,13 +385,13 @@ button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;pos
         • با لمس هر خانه، واژهٔ <b>افقی</b> آن انتخاب می‌شود؛ با لمس دوبارهٔ همان خانه، جهت به <b>عمودی</b> تغییر می‌کند.<br>
         • با کیبورد داخل بازی، حرف‌ها را تایپ کن؛ بعد از هر حرف به خانهٔ بعد می‌روی.<br>
         • کلید «پاک‌کردن» حرف را حذف می‌کند و به خانهٔ قبلی برمی‌گردد.<br>
-        • حرف‌های تایپی کاشی آبی دارند؛ با کامل‌شدن واژه، حرف‌های درست سبز و قفل می‌شوند و حرف‌های اشتباه سرخ می‌شوند تا همان‌ها را عوض کنی.<br>
+        • هر جدول رنگ و تابش ویژهٔ خودش را دارد؛ حرف‌های تایپی کاشی رنگی همان جدول می‌گیرند. با کامل‌شدن واژه، حرف‌های درست سبز و قفل می‌شوند و حرف‌های اشتباه سرخ می‌شوند تا همان‌ها را عوض کنی.<br>
         • جدول بعدی فقط بعد از حل جدول فعلی باز می‌شود.
       </div>
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۲٫۱</div>
+    <div class="ver">جدولک نسخه ۲٫۲</div>
   </div>
 </div>
 
@@ -422,7 +434,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.10.2";
+const APP_V = "2026.10.10.3";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -643,8 +655,24 @@ let day = null, models = [], pIdx = 0, P = null, cur = null;
 let typedCells = {};          // "r,c" -> letter  (current puzzle)
 let progress = {cur:0, typed:{}};
 let completeCache = {};       // puzzle n -> bool
-const THEME_HEAD = {1:"#060a18",2:"#060a18",3:"#060a18",4:"#060a18",5:"#060a18",
-                    6:"#060a18",7:"#060a18",8:"#060a18",9:"#060a18",10:"#060a18"};
+/* per-puzzle neon palettes (v2.2): each puzzle paints the Telegram
+   header/background + confetti in its own accent family — the deep head
+   color doubles as the circular-wipe flash so the transition previews the
+   next puzzle's identity. */
+const THEME_HEAD = {1:"#060a18",2:"#090614",3:"#0e0903",4:"#04121a",5:"#100516",
+                    6:"#0f0803",7:"#080a1c",8:"#12050d",9:"#070a12",10:"#0d0517"};
+const THEME_CONF = {
+  1:["#4cc9f0","#8b5cf6","#2dd4bf","#f472b6","#fde68a","#38bdf8","#a78bfa"],
+  2:["#a78bfa","#8b5cf6","#e879f9","#fde68a","#ffffff","#c4b5fd","#7c3aed"],
+  3:["#fbbf24","#f59e0b","#fde68a","#f472b6","#ffffff","#fcd34d","#d97706"],
+  4:["#38bdf8","#22d3ee","#7dd3fc","#fde68a","#ffffff","#67e8f9","#0ea5e9"],
+  5:["#e879f9","#f0abfc","#c084fc","#fde68a","#ffffff","#f5d0fe","#a855f7"],
+  6:["#fb923c","#f97316","#fdba74","#fde68a","#ffffff","#fed7aa","#ea580c"],
+  7:["#818cf8","#6366f1","#a5b4fc","#fde68a","#ffffff","#c7d2fe","#4f46e5"],
+  8:["#f272c8","#f9a8d4","#ec4899","#fde68a","#ffffff","#fbcfe8","#db2777"],
+  9:["#e2e8f0","#c9d8f7","#93c5fd","#fde68a","#ffffff","#cbd5e1","#bfdbfe"],
+  10:["#c084fc","#a855f7","#e9d5ff","#fde68a","#ffffff","#d8b4fe","#9333ea"],
+};
 
 /* ================= dynamic layout (grid + keyboard ALWAYS fit) =================
    2026-10-10 v2.1 fix: the old estimate forgot that CSS renders each keycap
@@ -1051,7 +1079,7 @@ function puzzleComplete(){
 
 /* ================= confetti & toast ================= */
 function confetti(count){
-  const colors = ["#4cc9f0","#8b5cf6","#2dd4bf","#f472b6","#fde68a","#38bdf8","#a78bfa"];
+  const colors = THEME_CONF[((P && P.n) ? ((P.n - 1) % 10) + 1 : 1)] || THEME_CONF[1];
   for(let i=0;i<count;i++){
     const el = document.createElement("div"); el.className = "confetti";
     el.style.left = (2+Math.random()*96)+"vw";
