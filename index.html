@@ -18,11 +18,12 @@ body{
   touch-action:manipulation;
   overscroll-behavior:none;
   background-color:var(--bg2);
-  transition:background-color .7s ease;
+  /* v2.3 perf: removed transition:background-color .7s — the root repaint
+     it caused for 700ms after every theme swap was invisible (covered by
+     #bg) yet stole frames from the new puzzle's first render */
   overflow:hidden;
 }
-#bg{position:fixed;inset:0;z-index:-1;transition:opacity .45s ease}
-#bg.fade{opacity:0}
+#bg{position:fixed;inset:0;z-index:-1}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;position:relative}
 :root{
   --csz:40px;          /* cell size — set dynamically */
@@ -69,7 +70,12 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
   radial-gradient(90% 60% at 88% 112%,var(--bgB) 0%,transparent 62%),
   radial-gradient(70% 50% at 10% 106%,var(--bgC) 0%,transparent 58%),
   linear-gradient(180deg,var(--bg2) 0%,var(--bg1) 74%)}
-#bg::before{content:"";position:absolute;inset:-42%;background-image:
+/* v2.3 perf: inset was -42% (184vw x 184vh texture ~3.4x the viewport,
+   scaled up to 1.07) which thrashed weak mobile GPUs and made every other
+   animation stutter. -12% + translate-only drift keeps the SAME star
+   drift look at ~2.5x less raster/paint area. will-change pins it to the
+   compositor so fullscreen repaints (theme swap) never touch it. */
+#bg::before{content:"";position:absolute;inset:-12%;will-change:transform;background-image:
   radial-gradient(2.5px 2.5px at 12% 22%,var(--pa1) 50%,transparent 51%),
   radial-gradient(2px 2px at 28% 68%,var(--pa2) 50%,transparent 51%),
   radial-gradient(2px 2px at 44% 12%,var(--pa3) 50%,transparent 51%),
@@ -81,7 +87,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
   radial-gradient(2.2px 2.2px at 34% 40%,var(--pa9) 50%,transparent 51%),
   radial-gradient(2px 2px at 70% 8%,var(--pa10) 50%,transparent 51%);
   animation:drift 46s ease-in-out infinite alternate}
-@keyframes drift{from{transform:translate3d(-3%,-2%,0) scale(1.03)}to{transform:translate3d(3%,2.5%,0) scale(1.07)}}
+@keyframes drift{from{transform:translate3d(-4%,-3%,0)}to{transform:translate3d(4%,3%,0)}}
 #bg::after{content:"";position:absolute;inset:0;background-image:
   radial-gradient(1.5px 1.5px at 12% 18%,#fff7 50%,transparent 51%),
   radial-gradient(1px 1px at 30% 8%,#fff6 50%,transparent 51%),
@@ -112,7 +118,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 .brand-sub{font-size:.55rem;letter-spacing:.34em;color:var(--brand-sub);font-weight:700;direction:ltr;text-shadow:0 0 8px var(--soft-sh);line-height:1.1}
 
 /* ---- clue banner: ivory-champagne glass panel with neon blue lines ---- */
-.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,var(--banner-bg1) 0%,var(--banner-bg2) 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;position:relative;box-shadow:0 0 22px -3px var(--banner-glow1),0 0 42px -10px var(--banner-glow2),0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59,inset 0 0 16px #ffffff3d;transition:box-shadow .3s}
+.clue-banner{flex:0 0 auto;height:74px;display:flex;align-items:center;gap:10px;background:linear-gradient(180deg,var(--banner-bg1) 0%,var(--banner-bg2) 100%);border:1.5px solid var(--banner-bd);border-radius:var(--radius);padding:8px 12px;position:relative;box-shadow:0 0 22px -3px var(--banner-glow1),0 0 42px -10px var(--banner-glow2),0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 0 1px #ffffff59,inset 0 0 16px #ffffff3d}
 /* neon light-line under the panel's top edge — pure CSS glow accent */
 .clue-banner::before{content:"";position:absolute;left:12px;right:12px;top:3px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent 0%,var(--line1) 16%,var(--line2) 50%,var(--line3) 84%,transparent 100%);box-shadow:0 0 10px var(--line-sh1),0 0 20px var(--line-sh2);pointer-events:none}
 .clue-banner.shake{box-shadow:0 0 22px -3px #f472b6b3,0 0 42px -10px #f472b666,0 8px 20px -10px #000b,inset 0 1px 0 #fffdf6,inset 0 0 16px #ffffff3d}
@@ -131,9 +137,13 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 .menu-btn:active{transform:scale(.88)}
 .lvl-label{font-size:.82rem;font-weight:800;white-space:nowrap;color:var(--ink);text-shadow:0 0 12px var(--acc-tsh)}
 .dots{flex:1;display:flex;gap:4px;justify-content:flex-start;overflow:hidden}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--dot-bg);border:1px solid var(--dot-bd);box-shadow:inset 0 1px 2px #0009;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
-.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px var(--dot-cur-sh1),0 0 12px var(--dot-cur-sh2);animation:dotPulse 2.6s ease-in-out infinite}
-@keyframes dotPulse{50%{box-shadow:0 0 0 4px var(--dot-cur-sh3),0 0 16px var(--dot-cur-sh4)}}
+.dot{position:relative;width:8px;height:8px;border-radius:50%;background:var(--dot-bg);border:1px solid var(--dot-bd);box-shadow:inset 0 1px 2px #0009;transition:transform .3s cubic-bezier(.34,1.56,.64,1),background-color .4s;cursor:pointer;flex:0 0 auto}
+/* v2.3 perf: the pulse used to animate box-shadow (a main-thread repaint
+   every frame, forever). The halo ring is now a ::after whose OPACITY
+   pulses — GPU-composited, zero repaints, same breathing glow. */
+.dot.cur{transform:scale(1.45);border-color:var(--accent);box-shadow:0 0 0 2px var(--dot-cur-sh1),0 0 12px var(--dot-cur-sh2)}
+.dot.cur::after{content:"";position:absolute;inset:-4px;border-radius:50%;box-shadow:0 0 12px var(--dot-cur-sh2),0 0 0 2px var(--dot-cur-sh3);opacity:.8;animation:dotPulse 2.6s ease-in-out infinite}
+@keyframes dotPulse{50%{opacity:.15}}
 .dot.done{background:linear-gradient(180deg,var(--dot-done1),var(--dot-done2));border-color:var(--dot-done-bd);box-shadow:0 0 11px var(--dot-cur-sh2)}
 .dot.lock{opacity:.35;cursor:default}
 .dot.just-unlocked{animation:dotUnlock .7s cubic-bezier(.34,1.56,.64,1)}
@@ -155,7 +165,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 .num{position:absolute;top:0;right:2px;padding:0 1px;border-radius:4px;background:var(--num-bg);font-size:max(8px,calc(var(--csz)*.23));font-weight:800;color:var(--num-c);pointer-events:none;line-height:1.15;transition:color .2s,transform .25s cubic-bezier(.34,1.56,.64,1);z-index:2;text-shadow:0 0 8px var(--num-sh)}
 .num.on{color:var(--tag-ink);background:linear-gradient(165deg,var(--tag1),var(--tag2));font-weight:900;transform:scale(1.18);box-shadow:0 0 10px var(--tag-glow1)}
 /* empty cells = dark glass tiles, slightly recessed, glowing edges */
-.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,var(--cell) 0%,var(--cell-bg2) 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 var(--cell-in2),0 0 8px var(--cell-halo);transition:background-color .18s,border-color .18s,transform .12s;position:relative;cursor:pointer}
+.cell{width:var(--csz);height:var(--csz);background:linear-gradient(180deg,var(--cell) 0%,var(--cell-bg2) 100%);border:1px solid var(--cell-bd);border-radius:6px;display:grid;place-items:center;font-size:calc(var(--csz)*.52);font-weight:800;color:var(--cell-ink);box-shadow:inset 0 2px 6px #000000b3,inset 0 -1px 0 var(--cell-in2),0 0 8px var(--cell-halo);position:relative;cursor:pointer}
 /* blocked cells = matte grey-blue blocks, NO glow — clearly different from the glowing sockets */
 .cell.void{background:#1a2542;border-color:#26325acc;box-shadow:inset 0 1px 3px #00000080;cursor:default}
 /* active word = electric-blue wash over the dark glass */
@@ -184,7 +194,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 @keyframes cellErr{20%{transform:translateX(4px)}40%{transform:translateX(-4px)}60%{transform:translateX(3px)}80%{transform:translateX(-2px)}}
 .cell.flip{animation:flipIn .5s ease both}
 @keyframes flipIn{0%{transform:rotateX(0)}45%{transform:rotateX(88deg)}55%{transform:rotateX(-88deg)}100%{transform:rotateX(0)}}
-.grid-wrap.entrance .cell{animation:cellIn .4s both cubic-bezier(.2,.8,.3,1)}
+.grid-wrap.entrance .cell{animation:cellIn .3s both cubic-bezier(.2,.8,.3,1)}
 @keyframes cellIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
 .word-sweep{position:relative;overflow:hidden}
 .word-sweep::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 20%,#ffffffb8 50%,transparent 80%);animation:sweep .55s ease}
@@ -205,10 +215,14 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
    light and chic pressed states (letters/order/⌫ position untouched). ---- */
 .kbd{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 0;direction:ltr}
 .krow{display:flex;gap:5px;justify-content:center}
-.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,var(--kbd) 0%,var(--kbd-bg2) 100%);border:1px solid var(--kbd-bd);border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px var(--kbd-glow);transition:transform .09s,filter .09s,box-shadow .09s;cursor:pointer}
+.key{position:relative;flex:1 1 0;min-width:0;max-width:58px;height:calc(var(--kh) + 8px);background:linear-gradient(180deg,var(--kbd) 0%,var(--kbd-bg2) 100%);border:1px solid var(--kbd-bd);border-radius:calc(var(--kh)*.36);font-size:calc(var(--kh)*.6);font-weight:800;color:var(--kbd-ink);display:grid;place-items:center;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px var(--kbd-glow);transition:transform .09s;cursor:pointer}
 /* middle row gets the violet edge light (subtle blue/violet alternation) */
 .krow:nth-child(2) .key{border-color:var(--kbd2-bd);box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -3px 6px #00000073,0 3px 8px -2px #000a,0 0 12px var(--kbd2-glow)}
-.key:active,.key.pressed{transform:scale(.9);filter:brightness(1.28);box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 18px var(--key-press1),0 0 7px var(--key-press2)}
+/* v2.3 perf: pressed state = transform + instant glow swap (one repaint
+   of a tiny keycap) instead of animating filter+box-shadow across ~6
+   frames — typing stays fluid on weak GPUs; the ::after halo pulse is
+   opacity/transform and fully composited. */
+.key:active,.key.pressed{transform:scale(.9);color:#fff;box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -2px 4px #0006,0 0 18px var(--key-press1),0 0 7px var(--key-press2)}
 .key::after{content:"";position:absolute;inset:-2px;border-radius:inherit;border:2px solid var(--accent);opacity:0;transform:scale(.82);pointer-events:none}
 .key.pressed::after{animation:halo .34s ease-out}
 @keyframes halo{from{opacity:.75;transform:scale(.82)}to{opacity:0;transform:scale(1.12)}}
@@ -217,7 +231,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
    user's standard layout (ردیف سوم: ضربدر، چ و پ د ذ ر ز ژ ط ظ).
    Visually DISTINCT: violet→pink neon glass so it is instantly recognizable. */
 .key.bk{max-width:86px;background:linear-gradient(180deg,#3a2560f2 0%,#241547f2 100%);border-color:#c084fc80;box-shadow:inset 0 1px 0 #ffffff22,inset 0 -3px 6px #00000080,0 0 16px #a855f77a,0 0 6px #ec489966;color:#fbeaff}
-.key.bk:active,.key.bk.pressed{transform:scale(.9);filter:brightness(1.3);box-shadow:inset 0 1px 0 #ffffff30,inset 0 -2px 4px #0006,0 0 22px #e879f9c0,0 0 8px #ec489996}
+.key.bk:active,.key.bk.pressed{transform:scale(.9);color:#fff;box-shadow:inset 0 1px 0 #ffffff30,inset 0 -2px 4px #0006,0 0 22px #e879f9c0,0 0 8px #ec489996}
 .key.bk::after{border-color:#e879f9}
 .key.bk svg{width:58%;height:58%;max-width:30px;max-height:30px;fill:currentColor}
 
@@ -275,16 +289,21 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 #win p{font-size:.9rem;color:var(--sub);font-weight:600;line-height:1.9}
 #win .btn{margin-top:14px;min-width:200px}
 .confetti{position:fixed;top:-4vh;width:10px;height:14px;z-index:91;pointer-events:none;animation:confFall var(--dur,2.4s) cubic-bezier(.3,.5,.6,1) var(--delay,0s) forwards;opacity:0}
-.confetti i{display:block;width:100%;height:100%;background:var(--c,#fbbf24);border-radius:2px;transform:rotate(var(--r,0deg));animation:confSpin var(--dur,2.4s) linear infinite}
+.confetti i{display:block;width:100%;height:100%;background:var(--c,#fbbf24);border-radius:2px;transform:rotate(var(--r,0deg));animation:confSpin var(--dur,2.4s) linear forwards}
 @keyframes confFall{3%{opacity:1}to{transform:translateY(112vh);opacity:0}}
 @keyframes confSpin{to{transform:rotate(calc(var(--r,0deg) + 540deg))}}
 
 /* ================= level-change wipe ================= */
-#wipe{position:fixed;inset:0;z-index:70;pointer-events:none;opacity:0;background:var(--bg1,#333)}
-#wipe.cover{animation:wipeCover .34s ease-in forwards}
-#wipe.reveal{animation:wipeReveal .4s ease-out forwards}
-@keyframes wipeCover{from{opacity:1;clip-path:circle(0% at 50% 44%)}to{opacity:1;clip-path:circle(120% at 50% 44%)}}
-@keyframes wipeReveal{from{opacity:1;clip-path:circle(120% at 50% 44%)}to{opacity:0;clip-path:circle(120% at 50% 44%)}}
+/* v2.3 perf: the circular wipe used clip-path animation — main-thread
+   (full-screen repaint per frame) on many Android/iOS WebViews, which is
+   exactly the "پرش تصویر" jarring users saw on level change. A solid
+   circle that SCALES up from 50%/44% is pixel-identical to the eye and
+   runs entirely on the compositor (transform+opacity only). */
+#wipe{position:fixed;left:50%;top:44%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;z-index:70;pointer-events:none;opacity:0;background:var(--bg1,#333);transform:scale(0);will-change:transform,opacity}
+#wipe.cover{animation:wipeCover .24s cubic-bezier(.3,.1,.6,1) forwards}
+#wipe.reveal{animation:wipeReveal .24s ease-out forwards}
+@keyframes wipeCover{from{opacity:1;transform:scale(0)}to{opacity:1;transform:scale(90)}}
+@keyframes wipeReveal{from{opacity:1;transform:scale(90)}to{opacity:0;transform:scale(90)}}
 
 /* ================= toast ================= */
 #toast{position:fixed;top:calc(10px + env(safe-area-inset-top));right:50%;transform:translateX(50%);z-index:120;background:linear-gradient(180deg,#122a4bf5,#0c1c38f5);border:1.5px solid #2dd4bf9e;color:#eafff8;font-weight:800;font-size:.95rem;padding:11px 20px;border-radius:999px;box-shadow:0 0 22px -4px #2dd4bf99,0 0 38px -8px #2dd4bf54,0 10px 26px -8px #000c;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;max-width:88vw;text-align:center}
@@ -434,7 +453,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.10.3";
+const APP_V = "2026.10.10.4";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -717,8 +736,12 @@ function layout(){
   const rs = document.documentElement.style;
   rs.setProperty("--csz", csz+"px");
   rs.setProperty("--kh", kh+"px");
-  /* guarantee pass: after the flexbox settles, re-fit from REAL measurements */
-  requestAnimationFrame(fitGrid);
+  /* v2.3 perf: guarantee pass now runs SYNCHRONOUSLY in the same task —
+     --csz settles BEFORE the frame paints, so the grid is never seen
+     resizing/jumping a frame after it first appears. (Reading zone.clientHeight
+     right after the --kh write forces one clean layout; the zone's height
+     never depends on the grid itself, so this is stable and loop-free.) */
+  fitGrid();
 }
 /* measured fit — the grid zone's height never depends on the grid itself
    (it is the only shrinkable flex child with min-height:0), so this reading
@@ -753,7 +776,7 @@ function renderGrid(){
       const cell = P.cells[r+","+c];
       const d = document.createElement("div");
       d.className = cell ? "cell" : "cell void";
-      d.style.animationDelay = ((r+c)*16)+"ms";
+      d.style.animationDelay = ((r+c)*9)+"ms";
       if(cell){
         cell.el = d;
         d.addEventListener("pointerdown", ()=>tapCell(cell));
@@ -771,8 +794,10 @@ function renderGrid(){
       wrap.appendChild(d);
     }
   }
+  /* v2.3 perf: no forced reflow here — the cells above are FRESH nodes
+     (innerHTML was wiped), so their entrance animations start on insertion;
+     the remove+re-add of .entrance in the same task is enough. */
   wrap.classList.remove("entrance");
-  void wrap.offsetWidth;
   wrap.classList.add("entrance");
 }
 
@@ -803,13 +828,16 @@ function pressFx(el){
   haptic("impact","light");
 }
 
+/* v2.3 perf: typing path — no forced reflow and no .pop bounce restart per
+   keystroke (each was a synchronous layout + an extra animation that made
+   letters feel late and the grid twitchy). Fresh .lt spans still get their
+   letterIn pop via CSS on creation; overwrites are instant. */
 function renderCellLetter(cell, ch){
   if(!cell.el) return;
   let lt = cell.el.querySelector(":scope > .lt");
   if(!lt){ lt = document.createElement("span"); lt.className = "lt"; cell.el.appendChild(lt); }
   lt.textContent = ch || "";
   lt.classList.remove("err");   /* err is only re-applied by markWrong after evaluation */
-  if(ch){ cell.el.classList.remove("pop"); void cell.el.offsetWidth; cell.el.classList.add("pop"); }
 }
 
 function renderDots(){
@@ -844,14 +872,20 @@ function updateBanner(){
   b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
 }
 
+/* v2.3 perf: the previously highlighted elements are TRACKED — no two
+   document-wide querySelectorAll sweeps on every keystroke. Detached
+   refs (after renderGrid rebuilds) are harmless no-ops. */
+let _hlEls = [], _curEl = null, _numEl = null;
 function updateHighlights(){
-  document.querySelectorAll(".cell.hl,.cell.cur").forEach(el=>el.classList.remove("hl","cur"));
-  document.querySelectorAll(".num.on").forEach(el=>el.classList.remove("on"));
+  for(const el of _hlEls) el.classList.remove("hl");
+  if(_curEl) _curEl.classList.remove("cur");
+  if(_numEl) _numEl.classList.remove("on");
+  _hlEls = []; _curEl = null; _numEl = null;
   if(!cur) return;
-  cur.word.cells.forEach(c=>{ if(c.el) c.el.classList.add("hl"); });
-  if(cur.cell.el) cur.cell.el.classList.add("cur");
+  cur.word.cells.forEach(c=>{ if(c.el){ c.el.classList.add("hl"); _hlEls.push(c.el); } });
+  if(cur.cell.el){ cur.cell.el.classList.add("cur"); _curEl = cur.cell.el; }
   const badge = P.badgeEls[cur.word.num];
-  if(badge) badge.classList.add("on");
+  if(badge){ badge.classList.add("on"); _numEl = badge; }
 }
 
 function updateWordProgress(){
@@ -882,8 +916,8 @@ function applyTheme(n, instant){
     wipe.classList.remove("cover");
     void wipe.offsetWidth;
     wipe.classList.add("reveal");
-    setTimeout(()=>wipe.classList.remove("reveal"), 450);
-  }, 340);
+    setTimeout(()=>wipe.classList.remove("reveal"), 280);
+  }, 250);
 }
 function setTgColors(head){
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -940,6 +974,7 @@ function typeLetter(ch){
    neutral blue tile. This is presentation only — no validation, answer or
    persistence logic is touched. */
 function markWrong(word, animate){
+  const shakes = [];
   word.cells.forEach(c=>{
     if(c.locked || !c.el) return;
     const t = typedCells[c.r+","+c.c];
@@ -948,12 +983,15 @@ function markWrong(word, animate){
     if(!lt) return;
     const bad = t !== c.sol;
     lt.classList.toggle("err", bad);
-    if(bad && animate){
-      c.el.classList.remove("errshake"); void c.el.offsetWidth;
-      c.el.classList.add("errshake");
-      setTimeout(()=>{ c.el.classList.remove("errshake"); }, 420);
-    }
+    if(bad && animate) shakes.push(c.el);
   });
+  /* v2.3 perf: ONE forced reflow for the whole batch, not one per cell */
+  if(shakes.length){
+    for(const el of shakes) el.classList.remove("errshake");
+    void shakes[0].offsetWidth;
+    for(const el of shakes) el.classList.add("errshake");
+    setTimeout(()=>{ for(const el of shakes) el.classList.remove("errshake"); }, 420);
+  }
 }
 
 function backspace(){
@@ -1008,6 +1046,7 @@ function lockWord(word){
   const startEl = word.cells[0] && word.cells[0].el;
   if(startEl){ startEl.classList.add("word-sweep"); setTimeout(()=>startEl.classList.remove("word-sweep"), 600); }
   persist();
+  flushPersist();               /* a locked word hits the disk immediately */
   toast("✅ " + (word.d==="h" ? "افقی " : "عمودی ") + fa(word.num) + " حل شد!");
   haptic("notif","success");
   updateWordProgress(); renderDots();
@@ -1018,10 +1057,32 @@ function lockWord(word){
 }
 
 /* ================= puzzles & progress ================= */
+/* v2.3 perf: persist() used to write localStorage + Telegram CloudStorage
+   SYNCHRONOUSLY on every keystroke — on slow phones that alone added tens
+   of ms of delay per letter. Now the in-memory progress updates stay
+   synchronous (the live state never lags) while the disk/cloud write is
+   coalesced into one save ~0.5s after the last keystroke. The write is
+   force-flushed at every critical boundary: puzzle switch, word lock,
+   puzzle complete, tab hide and page unload — so no letter can ever be
+   lost. Same data, same keys, only the timing of the write changed. */
+let _saveTimer = 0, _saveDirty = false;
 function persist(){
   progress.cur = P ? P.n : 1;
   if(P) progress.typed[P.n] = typedCells;
-  saveProgress(progress);
+  _saveDirty = true;
+  if(_saveTimer) return;
+  _saveTimer = setTimeout(()=>{
+    _saveTimer = 0;
+    if(_saveDirty){ _saveDirty = false; saveProgress(progress); }
+  }, 500);
+}
+function flushPersist(){
+  if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer = 0; }
+  if(_saveDirty){ _saveDirty = false; saveProgress(progress); }
+}
+function dropPendingSave(){
+  if(_saveTimer){ clearTimeout(_saveTimer); _saveTimer = 0; }
+  _saveDirty = false;
 }
 
 function isPuzzleComplete(n){
@@ -1038,6 +1099,7 @@ function isUnlocked(n){
 }
 
 function openPuzzle(idx){
+  flushPersist();               /* v2.3: save letters typed in the previous puzzle BEFORE switching */
   pIdx = idx;
   P = models[idx];
   typedCells = progress.typed[P.n] || {};
@@ -1062,11 +1124,11 @@ function openPuzzle(idx){
 }
 
 function puzzleComplete(){
-  persist(); renderDots();
+  persist(); flushPersist(); renderDots();
   const last = pIdx >= day.puzzles.length-1;
   const all = day.puzzles.every(p=>isPuzzleComplete(p.n));
-  confetti(46);
-  setTimeout(()=>confetti(24), 500);
+  confetti(34);
+  setTimeout(()=>confetti(16), 500);
   haptic("notif","success");
   $("win-emoji").textContent = all ? "🏆" : "🎉";
   $("win-title").textContent = all ? "قهرمان جدولک!" : "آفرین!";
@@ -1201,15 +1263,18 @@ async function boot(){
 
   renderKeyboard();
 
-  /* menu buttons */
-  $("btn-menu").addEventListener("click", ()=>{ haptic("impact","light"); showSheet("sheet-menu"); });
-  $("sheet-scrim").addEventListener("click", hideSheet);
+  /* menu buttons — v2.3 perf: menu opens on POINTERDOWN (touch start)
+     instead of click (after touch end) so the sheet feels instant on
+     phones; sheet rows keep click since they are deliberate choices */
+  $("btn-menu").addEventListener("pointerdown", e=>{ e.preventDefault(); haptic("impact","light"); showSheet("sheet-menu"); });
+  $("sheet-scrim").addEventListener("pointerdown", e=>{ e.preventDefault(); hideSheet(); });
   $("m-share").addEventListener("click", ()=>{ hideSheet(); tgOpen(SHARE_URL); });
   $("m-about").addEventListener("click", ()=>showSheet("sheet-about"));
   $("m-help").addEventListener("click", ()=>showSheet("sheet-help"));
   $("about-back").addEventListener("click", ()=>showSheet("sheet-menu"));
   $("help-back").addEventListener("click", ()=>showSheet("sheet-menu"));
   $("m-reset").addEventListener("click", ()=>{
+    dropPendingSave();          /* v2.3: the reset intentionally discards pending letters */
     progress.typed[P.n] = {};
     typedCells = {};
     completeCache = {};
@@ -1218,6 +1283,7 @@ async function boot(){
     toast("🔄 جدول از نو شروع شد");
   });
   $("m-wipe").addEventListener("click", ()=>{
+    dropPendingSave();          /* v2.3: don't let a scheduled save resurrect old progress */
     progress = {cur:0, typed:{}};
     completeCache = {};
     saveProgress(progress);
@@ -1225,7 +1291,7 @@ async function boot(){
     toast("🧹 پیشرفت امروز پاک شد");
   });
   $("factcaster-link").addEventListener("click", e=>{ e.preventDefault(); tgOpen(ABOUT_LINK); });
-  $("btn-next").addEventListener("click", ()=>{
+  $("btn-next").addEventListener("pointerdown", ()=>{
     $("win").hidden = true;
     if(pIdx < day.puzzles.length-1){
       const dot = $("dots").children[pIdx+1];
@@ -1250,6 +1316,19 @@ async function boot(){
   loadStats();                    // non-blocking: 👥 players chip
   requestAnimationFrame(layout);
   setTimeout(layout, 350);   /* after WebView settles */
+  /* v2.3 perf: never lose letters if the WebView is killed or backgrounded
+     while a coalesced save is still pending */
+  window.addEventListener("pagehide", flushPersist);
+  document.addEventListener("visibilitychange", ()=>{ if(document.hidden) flushPersist(); });
+  /* pre-warm the menu sheet's style/layout ONCE while idle so the first
+     open doesn't pay the recalc cost mid-tap. No paint ever occurs: hidden
+     is restored before the frame renders. */
+  setTimeout(()=>{
+    try{
+      const sh = $("sheet");
+      sh.hidden = false; void sh.offsetHeight; sh.hidden = true;
+    }catch(e){}
+  }, 900);
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{ bootGate.then(()=>boot()); });
