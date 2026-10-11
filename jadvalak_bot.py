@@ -103,10 +103,12 @@ Architecture (2026-10-11 v5 — "correct getChatMember semantics"):
     even then the chat falls back to the last roster verdict instead of
     ever showing an error message.
   - members.json v3 carries BOTH the member hashes and a `left` list
-    (salted hashes of known NON-members). The grace window now admits only
-    genuinely unknown users: a known leaver is hard-gated even while grace
-    is active — the owner's own test (leave -> open the app) blocks within
-    the sweep period.
+    (salted hashes of known NON-members). v2.9 RETIRES the grace window:
+    an unknown hash now meets the gate too — the owner's test account
+    (never seen by the roster) sailed into the game seconds after leaving
+    precisely because grace admitted every unknown until Oct 14. One
+    /start in the chat verifies a real member LIVE and adds them to the
+    roster forever.
   - The sweep is real-time at small scale and adaptive at large: with
     ≤ 16 known users every user is checked every ~2.5 s tick; beyond that,
     non-members (anyone waiting on the gate screen) keep absolute priority
@@ -149,9 +151,9 @@ Architecture (2026-10-11 v4 — "live membership roster"):
      شدم» callback run getChatMember before the web_app button is issued;
      a successful verification is written to the roster + members.json is
      committed right away, so the freshly-issued button opens instantly.
-  - control.json can carry {"grace_until": <epoch>} — a transition window
-    during which the mini app lets not-yet-known players in (cold start of
-    the roster). The bot copies it into members.json for the client.
+  - control.json can carry {"grace_until": <epoch>} — legacy field, no
+    longer emitted into members.json (the v2.9 client ignores it entirely
+    and unknowns are gated); kept only so old control files parse clean.
 
 Run modes (env):
     BOT_TOKEN          the jadvalak bot token           (required)
@@ -192,7 +194,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.11.5"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.12.1"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "1440"))  # 1 day: bound any ?st= token that a WebView-cached LEGACY build might still validate (current builds ignore st entirely; the telegram-web-app.js bridge redirects legacy pages to the gated build before their st check can run)
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
@@ -272,7 +274,7 @@ _checker_idx: int = 0             # which checker token works
 _gate_broken_notified: set = set()
 _pinned_chats: set = set()        # chats whose game-button message we pinned
 _gh_lock = threading.Lock()       # serialises Contents-API writes
-_control_grace: int = 0           # epoch until which the app lets unknowns in
+_control_grace: int = 0           # legacy (v2.9): no longer emitted — kept for control.json compat
 
 # ---- stats state ----
 _seen_users: set = set()          # salted hashes of counted player ids
@@ -533,7 +535,7 @@ _roster_last_save = 0.0
 _members_last_commit = 0.0
 _members_last_hashes: frozenset = frozenset()
 _members_last_left: frozenset = frozenset()
-_members_last_grace: int = -1
+_members_last_grace: int = -1     # legacy (v2.9): grace retired, field unused
 _members_flip = False               # a verdict flipped -> force the next commit
 
 
@@ -764,8 +766,10 @@ def _seed_admins() -> None:
 
 def members_payload() -> dict:
     """v3: members AND `left` (salted hashes of recently-seen known
-    non-members). The client hard-gates `left` hashes even while the grace
-    window is open — a leaver is a leaver, cold start or not."""
+    non-members). The client hard-gates `left` hashes — and, since v2.9,
+    unknown hashes too: the grace_until cold-start window is retired, so
+    the field is no longer emitted (a stale client that still understands
+    it would only ever see it absent, which reads as no grace)."""
     cutoff = time.time() - LEFT_SEEN_DAYS * 86400
     with _roster_lock:
         members = sorted(member_hash(uid) for uid, st in _roster.items()
@@ -774,26 +778,24 @@ def members_payload() -> dict:
                       if st.get("m") is False
                       and (st.get("seen") or 0) > cutoff)
     return {"v": 3, "n": len(members), "members": members, "left": left,
-            "grace_until": _control_grace,
             "updated": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
 
 
 def members_commit(force: bool = False) -> bool:
-    """Publish data/members.json — when the member set, the left set OR the
-    grace value changed (or forced right after a chat verification / a
-    verdict flip). The client always fetches it cache-busted from
-    raw.githubusercontent, so a Pages rebuild is never on the critical
-    path."""
+    """Publish data/members.json — when the member set or the left set
+    changed (or forced right after a chat verification / a verdict flip).
+    The client always fetches it cache-busted from raw.githubusercontent
+    AND the Pages mirror in parallel (newest wins), so a Pages rebuild is
+    never on the critical path."""
     global _members_last_commit, _members_last_hashes, _members_last_left
-    global _members_last_grace, _members_flip
+    global _members_flip
     payload = members_payload()
     new_hashes = frozenset(payload["members"])
     new_left = frozenset(payload.get("left") or [])
     now = time.time()
     if not force:
         if (new_hashes == _members_last_hashes
-                and new_left == _members_last_left
-                and payload["grace_until"] == _members_last_grace):
+                and new_left == _members_last_left):
             return False
         if now - _members_last_commit < MEMBERS_COMMIT_GAP:
             return False           # changed but throttled — retried next tick
@@ -804,10 +806,9 @@ def members_commit(force: bool = False) -> bool:
     if ok:
         _members_last_hashes = new_hashes
         _members_last_left = new_left
-        _members_last_grace = payload["grace_until"]
         _members_flip = False
-        log.info("roster: members.json committed — %d members, %d left (grace=%d)",
-                 payload["n"], len(new_left), payload["grace_until"])
+        log.info("roster: members.json committed — %d members, %d left",
+                 payload["n"], len(new_left))
     return ok
 
 
@@ -822,8 +823,8 @@ def roster_loop() -> None:                       # daemon thread — never dies
             if GATE_CHAT_ID and CHECKER_TOKENS:
                 if first:
                     _seed_admins()      # cold start: know the owner's accounts
-                    # make sure data/members.json EXISTS on main (with the
-                    # current grace window) even with an empty roster
+                    # make sure data/members.json EXISTS on main even with
+                    # an empty roster (v2.9: no grace field any more)
                     members_commit(force=True)
                     first = False
                 for uid in _roster_next_batch():
@@ -1078,10 +1079,10 @@ def handle_update(upd: dict) -> None:
 # --------------------------------------------------------------------------- #
 
 def gateway_enabled() -> bool:
-    """Kill switch + grace window, both served from control.json in the repo:
-      {"gateway": "on", "grace_until": 1760000000}
-    grace_until is copied into members.json — during that window the mini app
-    still admits players that are not in the roster yet (cold start)."""
+    """Kill switch served from control.json in the repo:
+      {"gateway": "on"}
+    (grace_until is a legacy field the v2.9 client ignores — unknowns are
+    gated now; parsing it is harmless.)"""
     global _control_grace
     try:
         # cache-buster: raw.githubusercontent serves ~5 min of CDN cache on a
