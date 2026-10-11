@@ -17,10 +17,14 @@ Architecture (2026-10-08 v3 — "verification lives in the bot chat"):
     commands menu: a frozen menu-button URL could outlive channel
     membership and bypass the chat verification.
   - Button URLs still carry a signed ?st= token + &v=<deploy>: the v param
-    busts Telegram's WebView HTML cache (guaranteed fresh code), and the
-    1-day st token is legacy tolerance only — current builds ignore it, and
-    the telegram-web-app.js bridge redirects any WebView-cached legacy page
-    to the gated build before its own st validation could ever matter.
+    busts Telegram's WebView HTML cache (guaranteed fresh code). v2.10: the
+    st token is a 4-segment uid.iat.exp.sig LIVE membership vouch — the
+    mini app opens the game instantly for its holder (the bot verified
+    them in chat at iat) while its continuous re-check demotes on any
+    FRESH «no». Legacy 3-segment 30-day tokens on pre-Oct-8 buttons are
+    structurally rejected client-side, and the telegram-web-app.js bridge
+    redirects any WebView-cached legacy page to the current build before
+    its own st validation could ever matter.
   - /about: "طراحی، ساخت و اجرا توسط @factcaster"
   - Membership checks use a list of bot tokens (any bot that is an admin of
     the channel works — e.g. the channel's posting bot), so the gate works
@@ -194,8 +198,8 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.12.1"   # deploy version — keep in sync with index.html APP_V and version.json
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "1440"))  # 1 day: bound any ?st= token that a WebView-cached LEGACY build might still validate (current builds ignore st entirely; the telegram-web-app.js bridge redirects legacy pages to the gated build before their st check can run)
+APP_V = "2026.10.12.2"   # deploy version — keep in sync with index.html APP_V and version.json
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "1440"))  # 1 day: the ?st= token is the bot's LIVE membership vouch. v2.10 made the client honor it again (instant entry after a chat verification), but ONLY in the new 4-segment uid.iat.exp.sig format whose lifetime is capped at ~24 h — the legacy 3-segment 30-day tokens on pre-Oct-8 welcome-message buttons are structurally rejected client-side, so that hole stays shut. The continuous in-app re-check still demotes on any FRESH «no».
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 
@@ -812,11 +816,33 @@ def members_commit(force: bool = False) -> bool:
     return ok
 
 
+def _maybe_welcome_back(uid: int) -> None:
+    """v2.10: the sweep just saw a known user (re)join the channel. If the
+    bot chat has been quiet for a few minutes (no handler just served them
+    there), push ONE message with a fresh verified game button — a user who
+    joined and is staring at the mini app's gate screen, or who already
+    closed it, gets a visible one-tap way in the moment membership is
+    confirmed server-side (the roster flip the gate poll waits for lands
+    at the same time). Best-effort: failures are logged once and never
+    retried for that uid on this run."""
+    try:
+        with _roster_lock:
+            seen = (_roster.get(uid) or {}).get("seen") or 0
+        if time.time() - seen < 180:
+            return            # a handler just talked to them in-chat already
+        send(uid, "🎉 عضویتت در @daily_sciences تایید شد! هر وقت خواستی از همین دکمه وارد جدولک شو:",
+             kb_app(uid))
+        log.info("roster: welcome-back pushed to %s", uid)
+    except Exception as exc:
+        log.warning("welcome-back push failed for %s: %s", uid, exc)
+
+
 def roster_loop() -> None:                       # daemon thread — never dies
     log.info("roster: thread alive (tick=%ss, N=%d — every user every tick)",
              HOT_INTERVAL, len(_roster))
     first = True
     keepalive = time.time()
+    welcomed: set[int] = set()      # v2.10: one welcome-back push per uid per run
     while True:
         t0 = time.time()
         try:
@@ -828,7 +854,15 @@ def roster_loop() -> None:                       # daemon thread — never dies
                     members_commit(force=True)
                     first = False
                 for uid in _roster_next_batch():
-                    _roster_apply(uid, check_member_raw(uid))
+                    with _roster_lock:
+                        prev = (_roster.get(uid) or {}).get("m")
+                    res = check_member_raw(uid)
+                    _roster_apply(uid, res)
+                    # v2.10: a leave->join flip the SWEEP discovered (nobody
+                    # pressed anything in chat) deserves a visible push
+                    if res is True and prev is False and uid not in welcomed:
+                        welcomed.add(uid)
+                        _maybe_welcome_back(uid)
                 # a verdict flip (member left / leaver rejoined) must reach
                 # the gate screen ASAP — force past the throttle
                 if _members_flip:
@@ -859,8 +893,17 @@ def _b64u(data: bytes) -> str:
 
 
 def make_access_token(user_id: int, ttl_min: int = TOKEN_TTL_MIN) -> str:
-    exp = int(time.time()) + ttl_min * 60
-    body = f"{user_id}.{exp}"
+    """v2.10 format: uid.iat.exp.sig — FOUR segments. The iat (issued-at)
+    lets the client verify the token's TOTAL lifetime (<= ~25 h) without
+    the secret, which is what cleanly retires every legacy 3-segment
+    30-day token still sitting on old welcome-message buttons: they fail
+    the 4-part structural check and fall back to the full live verdict.
+    A valid new token means "the bot verified this user's membership
+    LIVE at iat", so the mini app opens the game instantly and its
+    continuous re-check keeps watching for a later leave."""
+    iat = int(time.time())
+    exp = iat + ttl_min * 60
+    body = f"{user_id}.{iat}.{exp}"
     sig = hmac.new(_gate_secret(), body.encode(), hashlib.sha256).digest()
     return f"{body}.{_b64u(sig)}"
 
@@ -920,15 +963,27 @@ def pin_message(chat_id: int, message_id: int | None) -> None:
 
 
 def verify_access_token(token: str, user_id: int | None) -> bool:
-    """Server-side check (also mirrored client-side in the app)."""
+    """Server-side check of the v2.10 4-segment format (uid.iat.exp.sig).
+    Legacy 3-segment tokens are rejected outright; a valid token must be
+    unexpired, issued at most ~5 min in the future (clock skew), and have
+    a total lifetime of at most ~25 h (the client enforces the same caps
+    structurally — the signature is only verifiable here)."""
     try:
-        uid_s, exp_s, sig_s = token.split(".")
-        uid, exp = int(uid_s), int(exp_s)
-        if exp < time.time():
+        parts = token.split(".")
+        if len(parts) != 4:
+            return False
+        uid_s, iat_s, exp_s, sig_s = parts
+        uid, iat, exp = int(uid_s), int(iat_s), int(exp_s)
+        now = time.time()
+        if exp < now:
+            return False
+        if iat > now + 300:
+            return False
+        if exp - iat > 86400 + 3600:      # <= ~25 h lifetime
             return False
         if user_id is not None and uid != user_id:
             return False
-        expected = hmac.new(_gate_secret(), f"{uid}.{exp}".encode(),
+        expected = hmac.new(_gate_secret(), f"{uid}.{iat}.{exp}".encode(),
                             hashlib.sha256).digest()
         got = base64.urlsafe_b64decode(sig_s + "=" * (-len(sig_s) % 4))
         return hmac.compare_digest(expected, got)
