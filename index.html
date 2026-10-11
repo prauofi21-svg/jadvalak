@@ -465,7 +465,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.11.1";
+const APP_V = "2026.10.11.2";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -486,15 +486,26 @@ let bootGate = Promise.resolve();
   }catch(e){}
 })();
 
-/* ================= channel membership (2026-10-11 v2.4) =================
+/* ================= channel membership (2026-10-11 v2.5) =================
    The app gates itself against data/members.json — a roster the gateway
-   bot keeps publishing from REAL getChatMember checks (salted id hashes of
-   current channel members + grace_until, the cold-start window).
+   bot keeps publishing from REAL getChatMember checks:
+     v3 "members" — salted id hashes of CURRENT channel members
+     v3 "left"    — salted hashes of KNOWN non-members (leavers!). A hash in
+                    `left` is a hard block that the grace window can NOT
+                    override — the fix for «کانال را ترک کرده اما جدولک هنوز
+                    برایش باز می‌شود»: a known leaver is gated the moment the
+                    bot's sweep flips them (≈ a minute), even mid-game.
+     "grace_until"— cold-start window that admits only GENUINELY unknown
+                    users (in neither list) while the roster bootstraps.
      member      -> straight into the game, zero friction, one window
      non-member  -> ONE quiet join screen; it AUTO-POLLS the roster, so the
                     moment the user joins the channel the game opens by
                     itself (usually < ~15 s). Nothing is ever sent to the
                     user — no bot messages, no second window, no «پیام مزاحم».
+   While the game is up, a quiet re-verification runs every ~50 s (and on
+   every return to foreground) so a player who LEAVES the channel is landed
+   on the join screen within about a minute — progress is flushed first and
+   the game resumes exactly where it was the moment they rejoin.
    The fetch is kicked off HERE so it runs in parallel with the version
    self-heal wait — the verdict costs members zero extra boot time. */
 const CHANNEL_URL = "https://t.me/daily_sciences";
@@ -537,6 +548,8 @@ async function membershipVerdict(prefetched){
   const h = await memberHash(uid);
   if(!h) return "unknown";                       /* ancient WebView w/o crypto.subtle */
   if(m.members.indexOf(h) >= 0) return "yes";
+  if(Array.isArray(m.left) && m.left.indexOf(h) >= 0)
+    return "no";                                 /* v3: KNOWN leaver — grace never shields this */
   const grace = +m.grace_until || 0;
   if(grace && Date.now()/1000 < grace) return "grace";
   return "no";
@@ -584,6 +597,16 @@ function gateResolve(){
   /* mid-boot gate: a startGame() is waiting on gateActive and finishes by
      itself; initial gate: startGame() has not run yet — boot it now */
   else if(!gameStarted) startGame();
+}
+/* v2.5: quiet re-verification while the game is up — a player who LEAVES the
+   channel is landed on the join screen within ~a minute (no popup, no
+   message; progress is flushed by enterGate and the game resumes where it
+   was the moment they rejoin). Fetch failures and unknowns never gate. */
+function quietRecheck(){
+  if(document.hidden || gateActive || !gameReady) return;
+  membershipVerdict()
+    .then(v =>{ if(v === "no" && !gateActive) enterGate(); })
+    .catch(()=>{});
 }
 function haptic(kind, style){
   try{
@@ -1465,6 +1488,10 @@ async function startGame(){
     }catch(e){}
   }, 900);
   gameReady = true;               /* v2.4: safe for a late gate to appear/resolve */
+  setInterval(quietRecheck, 50000);        /* v2.5: leaver landed within ~a minute */
+  document.addEventListener("visibilitychange", ()=>{
+    if(!document.hidden) quietRecheck();   /* v2.5: back-to-foreground re-check */
+  });
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{ bootGate.then(()=>boot()); });
