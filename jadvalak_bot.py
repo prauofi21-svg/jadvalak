@@ -25,6 +25,30 @@ Architecture (2026-10-08 v3 — "verification lives in the bot chat"):
     the channel works — e.g. the channel's posting bot), so the gate works
     from day one without extra BotFather/channel setup.
 
+Architecture (2026-10-11 v6 — "real-time membership detection"):
+  - The owner's live test showed the v2.5 latencies through the user's eyes:
+    leaving the channel and tapping the game button ~a minute later still
+    opened the game, and a player who joined from the gate screen sat
+    waiting. Root cause was pure LATENCY BUDGET: a 6 s tick that only
+    checked 2 users, an 8 s commit gap and a ~50 s client re-check added
+    up to ~1-2 minutes end-to-end — functioning, but nowhere near the
+    «بدون تأخیر» the owner asked for.
+  - v2.6 slashes every hop: the roster tick is 2.5 s and at the current
+    scale EVERY known user is re-checked on EVERY tick (leave/join is
+    detected within seconds); verdict flips force a members.json commit
+    within a 4 s gap; the client polls the roster every ~1.8 s on the gate
+    screen and re-verifies every ~7 s while playing. End-to-end both
+    directions is now ~5-10 s, and the chat path (/start, «عضو شدم»)
+    remains instant as always.
+  - members.json gets a 30-minute heartbeat commit so its "updated"
+    timestamp always proves the sweep is alive (today's debugging showed
+    how valuable that is).
+  - The gate screen itself no longer shows the title line the owner asked
+    to remove («جدولک برای اعضای کانال است» — removed from index.html) and
+    the app's roster fetch now gives raw.githubusercontent a tight budget
+    before falling back to the same-origin Pages copy, so networks that
+    block raw.githubusercontent don't pay the full serial timeout.
+
 Architecture (2026-10-11 v5 — "correct getChatMember semantics"):
   - ROOT-CAUSE fix: Telegram now answers getChatMember with 400
     PARTICIPANT_ID_INVALID for anyone who is NOT in the channel (verified
@@ -43,11 +67,12 @@ Architecture (2026-10-11 v5 — "correct getChatMember semantics"):
     genuinely unknown users: a known leaver is hard-gated even while grace
     is active — the owner's own test (leave -> open the app) blocks within
     the sweep period.
-  - The sweep is adaptive: a full pass over every known user takes ~60 s
-    while the base is small, stretching to ~25 min as it grows, so
-    leave-detection stays "در لحظه" at the current scale. Verdict flips
-    force an immediate members.json commit (≤ 8 s) so a rejoining player
-    staring at the gate screen is auto-let-in within seconds.
+  - The sweep is real-time at small scale and adaptive at large: with
+    ≤ 16 known users every user is checked every ~2.5 s tick; beyond that,
+    non-members (anyone waiting on the gate screen) keep absolute priority
+    while members rotate oldest-check-first. Verdict flips force an
+    immediate members.json commit (≤ 4 s) so a rejoining player staring at
+    the gate screen is auto-let-in within seconds.
   - Cold start: the roster seeds itself with the channel's human admins
     (getChatAdministrators), so the owner's accounts are covered from the
     first minute after a roster reset.
@@ -127,7 +152,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.11.2"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.11.3"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
@@ -152,10 +177,12 @@ MEMBERS_PATH = "data/members.json"          # public, client-served
 ROSTER_PATH = "data/roster.enc"             # encrypted ids (bot token key)
 RAW_BASE = ("https://raw.githubusercontent.com/"
             "prauofi21-svg/jadvalak/main/")
-HOT_INTERVAL = 6.0        # s between roster ticks
+HOT_INTERVAL = 2.5        # s between roster ticks (v2.6: was 6 — flips now land in seconds)
 HOT_PER_TICK = 25         # max hot (non-member/unknown) users re-checked per tick
-SWEEP_TICKS = 250         # ~ full sweep every 250 ticks (~25 min) at scale
-MEMBERS_COMMIT_GAP = 8.0     # s, min gap between members.json commits (fast flips)
+FAST_ALL_MAX = 16         # ≤ this many known users: EVERYONE is checked EVERY tick
+SWEEP_BUDGET = 10         # max getChatMember calls per tick once N > FAST_ALL_MAX
+MEMBERS_COMMIT_GAP = 4.0     # s, min gap between members.json commits (fast flips)
+MEMBERS_KEEPALIVE = 1800.0   # s, heartbeat commit so members.json freshness is visible
 LEFT_SEEN_DAYS = 60          # a hash stays in `left` while the user was seen recently
 ROSTER_COMMIT_GAP = 1200.0   # s, min gap between roster.enc commits (20 min)
 ROSTER_NEW_IDS_FLUSH = 8     # commit roster.enc early when this many new ids
@@ -393,7 +420,7 @@ def _member_verdict_raw(uid: int) -> bool | None:
                 r = requests.get(
                     f"{TG_API}/bot{token}/getChatMember",
                     params={"chat_id": GATE_CHAT_ID, "user_id": uid},
-                    headers=UA, timeout=(10, 20),
+                    headers=UA, timeout=(3, 6),
                 )
                 code = r.status_code
                 if code == 200:
@@ -620,20 +647,25 @@ def _roster_apply(uid: int, result: bool | None) -> None:
     _member_cache[uid] = (bool(result), time.time())
 
 
-def _sweep_ticks(n_users: int) -> int:
-    """Adaptive full-sweep length: ~60 s while the base is small (leave-
-    detection «در لحظه» at the current scale), stretching to the classic
-    ~25 min as the roster grows. Checks per tick stay ~2 either way."""
-    return max(10, min(SWEEP_TICKS, (n_users * 3) // int(HOT_INTERVAL) or 10))
-
-
 def _roster_next_batch() -> list:
-    """Which ids to check this tick: hot (unknown/non-member, freshest-seen
-    first, rotating window) + sweep (oldest check first, active users first)."""
+    """v2.6: which ids to check THIS tick.
+    At the current scale (N <= FAST_ALL_MAX) EVERY known user is re-checked
+    EVERY tick (~2.5 s) — leaving or joining the channel is detected
+    essentially in real time; a member who opens the game seconds after
+    leaving is already gated, and a player waiting on the gate screen is
+    admitted within one tick of joining.
+    Once N grows past FAST_ALL_MAX the per-tick API budget is capped:
+      hot (unknown/non-member, freshest-seen first, rotating window) keep
+      absolute priority — anyone ON the gate screen is verified within one
+      tick of joining — while members rotate oldest-check-first (active
+      users first), so leave-detection stays fast for real players."""
     global _roster_hot_cursor
     now = time.time()
     with _roster_lock:
         items = list(_roster.items())
+    if len(items) <= FAST_ALL_MAX:
+        items.sort(key=lambda kv: -(kv[1].get("seen") or 0))   # freshest first
+        return [uid for uid, _ in items]
     hot = [(uid, st) for uid, st in items if not st.get("m")]
     hot.sort(key=lambda kv: -(kv[1].get("seen") or 0))
     if len(hot) > HOT_PER_TICK:
@@ -642,14 +674,16 @@ def _roster_next_batch() -> list:
         window = hot[start:start + HOT_PER_TICK] + hot[:max(0, start + HOT_PER_TICK - len(hot))]
     else:
         window = hot
-    batch = max(2, -(-len(items) // _sweep_ticks(len(items))))
     # sweep pool: users WITH a verdict (unknowns are already covered by the
-    # hot window — giving them sweep slots would starve stale re-checks)
+    # hot window — giving them sweep slots would starve stale re-checks).
+    # Members ALWAYS keep at least 2 slots per tick: a permanently-full hot
+    # window (e.g. many long-time leavers) must never starve leave-detection
+    # for the actual players.
     known = [kv for kv in items if kv[1].get("m") is not None]
     sweep = sorted(known, key=lambda kv: (
         (kv[1].get("seen") or 0) < now - 86400,     # active users first
         kv[1].get("ts") or 0,                        # then oldest check
-    ))[:batch]
+    ))[:max(2, SWEEP_BUDGET - len(window))]
     out, seen = [], set()
     for uid, _ in window + sweep:
         if uid not in seen:
@@ -738,11 +772,12 @@ def members_commit(force: bool = False) -> bool:
 
 
 def roster_loop() -> None:                       # daemon thread — never dies
-    log.info("roster: thread alive (hot=%ss, sweep≈%ds at N=%d)",
-             int(HOT_INTERVAL), _sweep_ticks(len(_roster)) * int(HOT_INTERVAL),
-             len(_roster))
+    log.info("roster: thread alive (tick=%ss, N=%d — every user every tick)",
+             HOT_INTERVAL, len(_roster))
     first = True
+    keepalive = time.time()
     while True:
+        t0 = time.time()
         try:
             if GATE_CHAT_ID and CHECKER_TOKENS:
                 if first:
@@ -757,12 +792,17 @@ def roster_loop() -> None:                       # daemon thread — never dies
                 # the gate screen ASAP — force past the throttle
                 if _members_flip:
                     members_commit(force=True)
+                elif time.time() - keepalive > MEMBERS_KEEPALIVE:
+                    members_commit(force=True)   # heartbeat: proves the sweep is alive
+                    keepalive = time.time()
                 else:
                     members_commit()
             roster_save()
         except Exception as exc:                 # absolutely never crash the bot
             log.warning("roster tick crashed (ignored): %s", exc)
-        time.sleep(HOT_INTERVAL)
+        # v2.6: cadence-corrected sleep — the tick's own runtime no longer
+        # stretches the cycle, so "every user every 2.5 s" means exactly that
+        time.sleep(max(0.4, HOT_INTERVAL - (time.time() - t0)))
 
 
 # --------------------------------------------------------------------------- #
