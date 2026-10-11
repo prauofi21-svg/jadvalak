@@ -421,7 +421,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۲٫۲</div>
+    <div class="ver">جدولک نسخه ۲٫۹</div>
   </div>
 </div>
 
@@ -472,7 +472,7 @@ function tgReady(){
    legacy ?st= token gate can admit a channel-leaver. This inline self-heal
    remains as the second layer for any page whose cached JS is itself
    stale. */
-const APP_V = "2026.10.11.5";
+const APP_V = "2026.10.12.1";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -525,10 +525,11 @@ let bootGate = Promise.resolve();
    — the roster the gateway bot publishes from its own getChatMember checks.
    v3 "members" — salted id hashes of CURRENT channel members
    v3 "left"    — salted hashes of KNOWN non-members (leavers!). A hash in
-                  `left` is a hard block that the grace window can NOT
-                  override.
-   "grace_until"— cold-start window that admits only GENUINELY unknown
-                  users (in neither list) while the roster bootstraps.
+                  `left` is a hard block.
+   v2.9: the grace_until cold-start window is RETIRED — it admitted ANY
+         user the roster had never seen (the owner's test proved it), so
+         an unknown hash now meets the gate instead; one /start in the
+         bot chat verifies a real member live and adds them forever.
    Failures never gate: a fetch that fails entirely fails OPEN, and the
    periodic re-checks keep retrying in the background.
    The roster prefetch is kicked off HERE so it runs in parallel — the
@@ -544,17 +545,23 @@ const CHECKER_CHAT = "@daily_sciences";
 let gateActive = false, gateBound = false, gameStarted = false, gameReady = false;
 
 async function fetchMembers(){
-  /* v2.6: raw.githubusercontent FIRST with a TIGHT 1.4 s budget — it is
-     the freshest copy (verdict flips land there seconds after the gateway
-     commits), while the same-origin Pages mirror can lag a Pages rebuild.
-     The same-origin fetch is the fallback for networks where raw is
-     blocked (common in Iran): it never pays the full serial timeout any
-     more. Every attempt is cache-busted. */
+  /* v2.9: fire BOTH sources in parallel and keep the copy with the NEWER
+     `updated` stamp. The raw CDN can serve a minutes-old copy even
+     cache-busted (origin max-age=300 — a leave-flip needs up to ~5 min to
+     reach some edges), while the same-origin Pages mirror lags the Pages
+     rebuild (~1-2 min) instead. Whichever propagated first wins, so the
+     effective roster lag is the MINIMUM of the two — and on networks
+     where raw is blocked entirely (common in Iran) the same-origin copy
+     alone still decides. Every attempt is cache-busted. */
   for(let round=0; round<2; round++){
-    const raw = await fetchJSON(MEMBERS_URL, 1400);
-    if(raw) return raw;
-    const same = await fetchJSON("data/members.json", 2500);
-    if(same) return same;
+    const copies = await Promise.all([
+      fetchJSON(MEMBERS_URL, 1600),
+      fetchJSON("data/members.json", 2600),
+    ]);
+    const ok = copies.filter(Boolean);
+    if(ok.length)
+      return ok.reduce((a,b)=>
+        (Date.parse(b.updated)||0) > (Date.parse(a.updated)||0) ? b : a);
   }
   return null;
 }
@@ -632,9 +639,15 @@ async function membershipVerdict(prefetched){
   if(!h) return "unknown";                       /* ancient WebView w/o crypto.subtle */
   if(m.members.indexOf(h) >= 0) return "yes";
   if(Array.isArray(m.left) && m.left.indexOf(h) >= 0)
-    return "no";                                 /* v3: KNOWN leaver — grace never shields this */
-  const grace = +m.grace_until || 0;
-  if(grace && Date.now()/1000 < grace) return "grace";
+    return "no";                                 /* v3: KNOWN leaver — hard block */
+  /* v2.9: the grace window is GONE. It existed for the v2.4 cold-start,
+     but it silently admitted ANY user the roster had never seen — the
+     owner's test account sailed straight into the game seconds after
+     leaving the channel because no sweep had ever heard of it. A
+     genuinely unknown user now meets the gate; one /start in the bot
+     chat verifies them LIVE and adds them to the roster forever. A
+     failed FETCH still returns "unknown" above and fails open, so
+     members never see a false gate. */
   return "no";
 }
 const firstMembersFetch = fetchMembers();
@@ -657,13 +670,13 @@ function enterGate(){
 }
 async function gateCheckNow(){
   const v = await membershipVerdict();
-  if((v === "yes" || v === "grace") && gateActive) gateResolve();
+  if(v === "yes" && gateActive) gateResolve();
 }
 async function gatePollLoop(){
   let n = 0;
   while(gateActive){
     const v = await membershipVerdict();
-    if(v === "yes" || v === "grace"){ gateResolve(); return; }
+    if(v === "yes"){ gateResolve(); return; }
     n++;
     /* v2.7: each poll is a LIVE getChatMember — the moment Telegram itself
        registers the join, the very next poll (~1.8 s cycle + ~0.3 s API)
@@ -1467,8 +1480,8 @@ async function boot(){
   /* v2.4: membership verdict raced against a 1.8 s budget so members never
      wait on the roster fetch. Slow/failed checks fail OPEN (straight into
      the game, exactly like before) and the late answer still lands the gate
-     softly if it comes back a definitive «no» past the grace window — a slow
-     network can never show a member a false gate. */
+     softly if it comes back a definitive «no» — a slow network can never
+     show a member a false gate. */
   show("loading");
   const verdict = await Promise.race([
     membershipVerdict(firstMembersFetch),
