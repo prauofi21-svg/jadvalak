@@ -17,9 +17,10 @@ Architecture (2026-10-08 v3 — "verification lives in the bot chat"):
     commands menu: a frozen menu-button URL could outlive channel
     membership and bypass the chat verification.
   - Button URLs still carry a signed ?st= token + &v=<deploy>: the v param
-    busts Telegram's WebView HTML cache (guaranteed fresh code), and the st
-    token keeps WebView-cached OLDER app builds (which still validate it)
-    from ever showing their legacy gate to members clicking fresh buttons.
+    busts Telegram's WebView HTML cache (guaranteed fresh code), and the
+    1-day st token is legacy tolerance only — current builds ignore it, and
+    the telegram-web-app.js bridge redirects any WebView-cached legacy page
+    to the gated build before its own st validation could ever matter.
   - /about: "طراحی، ساخت و اجرا توسط @factcaster"
   - Membership checks use a list of bot tokens (any bot that is an admin of
     the channel works — e.g. the channel's posting bot), so the gate works
@@ -48,6 +49,27 @@ Architecture (2026-10-11 v6 — "real-time membership detection"):
     the app's roster fetch now gives raw.githubusercontent a tight budget
     before falling back to the same-origin Pages copy, so networks that
     block raw.githubusercontent don't pay the full serial timeout.
+
+Architecture (2026-10-11 v8 — "legacy cache bridge"):
+  - The owner's live test still showed the game opening from an OLD welcome
+    message's button. Root cause: pre-2026.10.08 builds — the HTML Telegram's
+    WebView serves from its cache for pre-Oct-8 button URLs (?st=<token>,
+    no v param) — have NO self-heal and NO membership check: they admit
+    anyone holding a signed st token issued while they were still a member
+    (30-day TTL in the Sep 26-27 era) or a saved jk:st:<uid> localStorage
+    token. No server-side fix can reach those frozen pages.
+  - The cure: telegram-web-app.js — the ONE subresource every build since
+    2026-09-22 loads BEFORE its own code — now carries a «legacy bridge»:
+    it purges the jk:st:* localStorage tokens and, whenever the page URL's
+    ?v= is missing or outdated, redirects (location.replace, v swapped in
+    place, fail-open) to the current versioned URL BEFORE the legacy st
+    gate can run. Cached legacy pages therefore land on the v2.7 live
+    getChatMember gate within one subresource revalidation (~HTTP cache
+    lifetime). Fresh buttons (v == this deploy) take a zero-cost fast path.
+  - TOKEN_TTL dropped 365d -> 1d so no st token in existence can outlive a
+    channel leave by more than a day even in a WebView that still serves a
+    stale copy of the script. index.html additionally purges jk:st:* keys
+    on every current-page boot as a second belt-and-braces layer.
 
 Architecture (2026-10-11 v7 — "sacrificial checker bot, ZERO latency"):
   - The owner created a dedicated checker bot (@Jadval_chekerbot, admin of
@@ -136,7 +158,7 @@ Run modes (env):
     CHECKER_TOKENS     comma-separated admin-bot tokens (first = jadvalak itself)
     GATE_CHAT_ID       channel id, e.g. -1001234567890  (required)
     APP_URL            https URL of the mini app        (required)
-    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 525600 = 365 days)
+    TOKEN_TTL_MIN      access-token lifetime, minutes   (default 1440 = 1 day)
     RUNTIME_MINUTES    how long to poll this instance   (default 345)
     START_OFFSET       getUpdates offset to resume from (default -1)
     GH_TOKEN / GATEWAY_REPO / GATEWAY_WORKFLOW — used to write the chain
@@ -170,8 +192,8 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.11.4"   # deploy version — keep in sync with index.html APP_V and version.json
-TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
+APP_V = "2026.10.11.5"   # deploy version — keep in sync with index.html APP_V and version.json
+TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "1440"))  # 1 day: bound any ?st= token that a WebView-cached LEGACY build might still validate (current builds ignore st entirely; the telegram-web-app.js bridge redirects legacy pages to the gated build before their st check can run)
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
 
