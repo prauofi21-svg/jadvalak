@@ -256,6 +256,8 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 .btn:active{transform:scale(.95)}
 .btn.ghost{background:linear-gradient(180deg,var(--chip-bg1),var(--chip-bg2));color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:inset 0 1px 0 #ffffff17,0 0 12px var(--chip-glow);text-shadow:none}
 .btn.busy{pointer-events:none;filter:saturate(.6) brightness(.9)}
+.gate-wait{display:flex;align-items:center;gap:9px;font-size:.85rem;color:var(--sub);font-weight:700;margin-top:2px}
+.gatedot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:dotPulse 1.6s ease-in-out infinite;flex:none}
 .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--panel-bd);border-top-color:var(--accent);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -331,6 +333,16 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
   <h2>جدولک داخل تلگرام باز می‌شود</h2>
   <p>این بازی یک مینی‌اپ تلگرامی است. از داخل ربات <b>@jadvalak_bot</b> اجرایش کن.</p>
   <button class="btn" id="btn-open-bot">🤖 باز کردن ربات جدولک</button>
+</div>
+
+<!-- ============ channel-membership gate (v2.4) ============ -->
+<div id="gate" class="screen" hidden>
+  <div class="logo">🧩</div>
+  <h2>جدولک برای اعضای کانال است</h2>
+  <p>برای بازی، عضو کانال دانشنامهٔ علمی <b>@daily_sciences</b> شو. بعد از عضویت، همین صفحه خودکار وارد بازی می‌شود — نیازی به هیچ کار دیگری نیست.</p>
+  <button class="btn" id="btn-join">📢 عضویت در کانال</button>
+  <button class="btn ghost" id="btn-gate-bot">🤖 قبلاً عضو هستی؟ یک‌بار از ربات وارد شو</button>
+  <p class="gate-wait" id="gate-wait"><i class="gatedot"></i>در حال بررسی خودکار عضویت…</p>
 </div>
 
 <!-- ============ loading / error ============ -->
@@ -453,7 +465,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.10.4";
+const APP_V = "2026.10.11.1";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -473,6 +485,106 @@ let bootGate = Promise.resolve();
     bootGate = Promise.race([check, timeout]);
   }catch(e){}
 })();
+
+/* ================= channel membership (2026-10-11 v2.4) =================
+   The app gates itself against data/members.json — a roster the gateway
+   bot keeps publishing from REAL getChatMember checks (salted id hashes of
+   current channel members + grace_until, the cold-start window).
+     member      -> straight into the game, zero friction, one window
+     non-member  -> ONE quiet join screen; it AUTO-POLLS the roster, so the
+                    moment the user joins the channel the game opens by
+                    itself (usually < ~15 s). Nothing is ever sent to the
+                    user — no bot messages, no second window, no «پیام مزاحم».
+   The fetch is kicked off HERE so it runs in parallel with the version
+   self-heal wait — the verdict costs members zero extra boot time. */
+const CHANNEL_URL = "https://t.me/daily_sciences";
+const MEMBER_SALT = "2adeb51be375c1ab70e971569537f425";   /* == bot MEMBER_SALT */
+const MEMBERS_URL = window.JK_MEMBERS_URL ||
+  "https://raw.githubusercontent.com/prauofi21-svg/jadvalak/main/data/members.json";
+let gateActive = false, gateBound = false, gameStarted = false, gameReady = false;
+
+async function fetchMembers(){
+  const bases = [MEMBERS_URL, "data/members.json"];
+  for(let round=0; round<2; round++){
+    for(const base of bases){
+      const url = base + (base.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), 2500);
+      try{
+        const res = await fetch(url, {cache:"no-store", signal:ctrl.signal});
+        clearTimeout(t);
+        if(res.ok){
+          const m = await res.json();
+          if(m && Array.isArray(m.members)) return m;
+        }
+      }catch(e){ clearTimeout(t); }
+    }
+  }
+  return null;
+}
+async function memberHash(uid){
+  try{
+    const buf = await crypto.subtle.digest("SHA-256",
+      new TextEncoder().encode(MEMBER_SALT + ":" + uid));
+    return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,16);
+  }catch(e){ return null; }
+}
+async function membershipVerdict(prefetched){
+  const uid = userId();
+  if(!uid) return "unknown";                     /* no Telegram user -> no-tg path anyway */
+  const m = await (prefetched || fetchMembers());
+  if(!m) return "unknown";                       /* fetch failed -> fail OPEN */
+  const h = await memberHash(uid);
+  if(!h) return "unknown";                       /* ancient WebView w/o crypto.subtle */
+  if(m.members.indexOf(h) >= 0) return "yes";
+  const grace = +m.grace_until || 0;
+  if(grace && Date.now()/1000 < grace) return "grace";
+  return "no";
+}
+const firstMembersFetch = fetchMembers();
+
+function enterGate(){
+  if(gateActive) return;
+  gateActive = true;
+  try{ flushPersist(); }catch(e){}                /* never lose typed letters */
+  show("gate");
+  if(!gateBound){
+    gateBound = true;
+    $("btn-join").addEventListener("click", ()=>{ haptic("impact","light"); tgOpen(CHANNEL_URL); });
+    $("btn-gate-bot").addEventListener("click", ()=>{ tgOpen(BOT_LINK); });
+    /* returning from the channel preview -> re-check immediately */
+    document.addEventListener("visibilitychange", ()=>{
+      if(!document.hidden && gateActive) gateCheckNow();
+    });
+  }
+  gatePollLoop();
+}
+async function gateCheckNow(){
+  const v = await membershipVerdict();
+  if((v === "yes" || v === "grace") && gateActive) gateResolve();
+}
+async function gatePollLoop(){
+  let n = 0;
+  while(gateActive){
+    const v = await membershipVerdict();
+    if(v === "yes" || v === "grace"){ gateResolve(); return; }
+    n++;
+    /* 2.2 s right after joining, 4.2 s for the first minute, then 8 s;
+       a hidden WebView backs off so we never drain the battery */
+    await new Promise(r=>setTimeout(r,
+      document.hidden ? 9000 : (n < 10 ? 2200 : n < 25 ? 4200 : 8000)));
+  }
+}
+function gateResolve(){
+  if(!gateActive) return;
+  gateActive = false;
+  toast("✅ عضویت تایید شد — خوش آمدی! 🎉");
+  haptic("notification","success");
+  if(gameReady) show("app");
+  /* mid-boot gate: a startGame() is waiting on gateActive and finishes by
+     itself; initial gate: startGame() has not run yet — boot it now */
+  else if(!gameStarted) startGame();
+}
 function haptic(kind, style){
   try{
     if(kind==="impact") TG.HapticFeedback.impactOccurred(style||"light");
@@ -536,14 +648,13 @@ function decodeWord(b64, key){
 }
 
 /* ================= user identity =================
-   2026-10-08 v3 — the gate is GONE from the mini app. Channel membership is
-   verified ONLY in the bot chat (@jadvalak_bot): the bot runs getChatMember
-   and hands out the «ورود به جدولک» web_app button ONLY to verified
-   members. The app itself always opens straight into the game — no join
-   screen, no token dance, no second window. Old signed ?st= params still
-   found on bot-button URLs are simply ignored here (and tolerated, so
-   WebView-cached older builds that still validate them never show their
-   gate to members clicking fresh buttons). */
+   2026-10-11 v2.4 — the app gates itself against the live membership roster
+   (data/members.json) that the gateway bot publishes from real
+   getChatMember checks. Members boot straight into the game; non-members
+   get the quiet auto-polling join screen (see the membership block above).
+   Old signed ?st= params still found on bot-button URLs are simply ignored
+   here (and tolerated, so WebView-cached older builds that still validate
+   them never show their legacy gate to members clicking fresh buttons). */
 function userId(){ const u = TG && TG.initDataUnsafe && TG.initDataUnsafe.user; return u && u.id ? u.id : 0; }
 
 /* ================= progress persistence (localStorage + Telegram CloudStorage) ================= */
@@ -1232,7 +1343,7 @@ function renderStats(s){
 
 /* ================= boot ================= */
 function show(id){
-  ["no-tg","loading","loaderr","app"].forEach(s=>{ $(s).hidden = (s!==id); });
+  ["no-tg","loading","loaderr","gate","app"].forEach(s=>{ $(s).hidden = (s!==id); });
 }
 
 async function boot(){
@@ -1245,10 +1356,29 @@ async function boot(){
     $("btn-open-bot").addEventListener("click", ()=>{ location.href = BOT_LINK; });
     return;
   }
-  /* inside Telegram: straight into the game. Channel membership was verified
-     by the bot in the chat BEFORE the «ورود به جدولک» button was issued —
-     the app never gates, never redirects, never opens a second window. */
+  /* v2.4: membership verdict raced against a 1.8 s budget so members never
+     wait on the roster fetch. Slow/failed checks fail OPEN (straight into
+     the game, exactly like before) and the late answer still lands the gate
+     softly if it comes back a definitive «no» past the grace window — a slow
+     network can never show a member a false gate. */
   show("loading");
+  const verdict = await Promise.race([
+    membershipVerdict(firstMembersFetch),
+    new Promise(res=>setTimeout(()=>res("slow"), 1800)),
+  ]);
+  if(verdict === "no"){ enterGate(); return; }
+  if(verdict === "slow" || verdict === "unknown"){
+    /* late answer: only land the gate once the game is fully up — never
+       fight a startGame() that is still mid-boot (fetch/layout) */
+    membershipVerdict(firstMembersFetch)
+      .then(late=>{ if(late === "no" && gameReady) enterGate(); })
+      .catch(()=>{});
+  }
+  await startGame();
+}
+
+async function startGame(){
+  gameStarted = true;
   $("btn-retry").addEventListener("click", ()=>location.reload());
   const date = tehranDate();
   const fetched = await fetchDay(date);
@@ -1310,6 +1440,11 @@ async function boot(){
       if(isUnlocked(n) && !isPuzzleComplete(n)){ start = n-1; break; }
     }
   }
+  /* v2.4: if a late «no» landed the gate while fetchDay was still running,
+     WAIT here until it resolves (the user joins -> gateResolve flips the
+     flag) and then render normally — startGame never re-runs, so no double
+     bindings; a non-member simply keeps the gate up while we wait. */
+  while(gateActive){ await new Promise(r=>setTimeout(r, 400)); }
   show("app");
   applyTheme(models[start].n, true);
   openPuzzle(start);
@@ -1329,6 +1464,7 @@ async function boot(){
       sh.hidden = false; void sh.offsetHeight; sh.hidden = true;
     }catch(e){}
   }, 900);
+  gameReady = true;               /* v2.4: safe for a late gate to appear/resolve */
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{ bootGate.then(()=>boot()); });
