@@ -1,30 +1,65 @@
 name: Gateway watchdog
 
-# Every 30 minutes: if no gateway run is in progress or queued AND the
-# control file is ON, dispatch a fresh gateway run (offset=-1 bootstrap).
-# This heals broken chains and GitHub hiccups.
+# Every 10 minutes: keep the gateway chain alive and healthy.
+#   1) CANCEL wedged runs — a run still in_progress after ~6.6 h is a dead
+#      runner (GitHub failed to enforce the job's own timeout-minutes; seen
+#      live on 2026-10-11: the bot was frozen for 8 h while the watchdog
+#      itself was starved by GitHub scheduling delays at */30).
+#   2) If no gateway run is in progress/queued AND control.json is ON,
+#      dispatch a fresh one (offset=-1 bootstrap). This heals broken chains
+#      and GitHub hiccups.
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
-  # actions: write is REQUIRED to dispatch the gateway workflow.
-  # (with only "read" the dispatch POST got 403 silently and the bot
-  # stayed down for hours while the watchdog reported success.)
+  # actions: write is REQUIRED to dispatch/cancel gateway runs.
   actions: write
   contents: read
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Is the gateway alive?
+      - name: Is the gateway alive (and not wedged)?
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
+          set -u
+          NOW=$(date +%s)
+
+          # 1) cancel wedged gateway runs (in_progress/queued far too long)
+          WEDGED=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/runs?per_page=30" \
+            | python3 -c "
+          import json, sys, datetime
+          now = float('$NOW')
+          runs = json.load(sys.stdin).get('workflow_runs', [])
+          out = []
+          for r in runs:
+              if r['status'] in ('in_progress', 'queued'):
+                  created = datetime.datetime.strptime(
+                      r['created_at'], '%Y-%m-%dT%H:%M:%SZ'
+                  ).replace(tzinfo=datetime.timezone.utc).timestamp()
+                  # gateway polls ~5h45m; 6.6h means the runner is wedged
+                  if now - created > 6.6 * 3600:
+                      out.append(str(r['id']))
+          print(' '.join(out))
+          ")
+          for RID in $WEDGED; do
+            echo "cancelling wedged gateway run $RID"
+            curl -s -o /dev/null -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/actions/runs/$RID/cancel" || true
+          done
+          [ -n "$WEDGED" ] && sleep 8
+
+          # 2) active check
           ACTIVE=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
             "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/runs?per_page=20" \
             | python3 -c "
@@ -60,9 +95,6 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$REPO/actions/workflows/gateway.yml/dispatches" \
             -d '{"ref":"main","inputs":{"offset":"-1"}}')
-          echo "dispatch HTTP $HTTP"
-          cat /tmp/dispatch_resp.json 2>/dev/null || true
-          if [ "$HTTP" != "204" ]; then
-            echo "::warning::gateway restart dispatch failed (HTTP $HTTP)"
-            exit 1
-          fi
+          echo "dispatch http $HTTP"
+          cat /tmp/dispatch_resp.json || true
+          [ "$HTTP" = "204" ] || exit 1
