@@ -25,7 +25,7 @@
    app. The redirect is idempotent (v swapped in place, every other param
    and the hash survive), so it can never loop. ?nobridge=1 skips it (test
    hook). Keep BRIDGE_V in sync with version.json on every deploy. */
-var JK_BRIDGE_V = "2026.10.12.1";
+var JK_BRIDGE_V = "2026.10.12.2";
 (function jkLegacyBridge() {
   try {
     if (/[?&]nobridge=1\b/.test(location.search)) { return; }
