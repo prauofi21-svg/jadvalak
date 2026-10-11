@@ -25,6 +25,40 @@ Architecture (2026-10-08 v3 — "verification lives in the bot chat"):
     the channel works — e.g. the channel's posting bot), so the gate works
     from day one without extra BotFather/channel setup.
 
+Architecture (2026-10-11 v4 — "live membership roster"):
+  - The mini app gates itself against a PUBLIC roster file (data/members.json)
+    that THIS bot maintains: a background thread keeps re-checking every
+    known user with getChatMember and commits the salted hashes of current
+    members to the repo. The app fetches that file (cache-busted, straight
+    from raw.githubusercontent so a Pages rebuild is never on the critical
+    path) and compares it with its own user-id hash:
+      member          -> straight into the game, zero friction (as before)
+      non-member      -> one quiet join screen with a «عضویت» button; the
+                         screen AUTO-POLLS the roster, so the moment the user
+                         joins the channel (usually < 10-15 s) the game opens
+                         by itself — no second window, no bot spam, no «عضو
+                         شدم» round-trip. THIS is the fix for the user's
+                         complaint that a member who LEFT the channel could
+                         keep playing: leavers drop out of the roster within
+                         the sweep interval (~25 min) and are gated on their
+                         next open.
+  - Freshness tiers of the roster thread:
+      hot set   (unknown / non-member users)  — re-checked every ~6 s so a
+                  fresh join is reflected almost instantly
+      full sweep (everyone, oldest-check first) — one pass every ~25 min so
+                  a leave is caught quickly even for dormant users
+  - Known-user ids are persisted ENCRYPTED in data/roster.enc (key derived
+    from BOT_TOKEN, which lives only in GitHub Secrets) — a public repo
+    never sees plaintext Telegram ids; members.json itself carries only
+    salted hashes of ids (salt is public and only prevents enumeration).
+  - Chat verification stays as it was: /start, any message and the «عضو
+     شدم» callback run getChatMember before the web_app button is issued;
+     a successful verification is written to the roster + members.json is
+     committed right away, so the freshly-issued button opens instantly.
+  - control.json can carry {"grace_until": <epoch>} — a transition window
+    during which the mini app lets not-yet-known players in (cold start of
+    the roster). The bot copies it into members.json for the client.
+
 Run modes (env):
     BOT_TOKEN          the jadvalak bot token           (required)
     CHECKER_TOKENS     comma-separated admin-bot tokens (first = jadvalak itself)
@@ -49,6 +83,7 @@ import hmac
 import json
 import logging
 import os
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -63,7 +98,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.10.4"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.11.1"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
@@ -80,6 +115,20 @@ CONTROL_URL = os.environ.get(
 )
 CHANNEL_URL = "https://t.me/daily_sciences"
 BOT_LINK = "https://t.me/jadvalak_bot"
+
+# ---- live membership roster (public members.json for the mini app) ----
+# MUST stay identical to MEMBER_SALT in index.html.
+MEMBER_SALT = "2adeb51be375c1ab70e971569537f425"
+MEMBERS_PATH = "data/members.json"          # public, client-served
+ROSTER_PATH = "data/roster.enc"             # encrypted ids (bot token key)
+RAW_BASE = ("https://raw.githubusercontent.com/"
+            "prauofi21-svg/jadvalak/main/")
+HOT_INTERVAL = 6.0        # s between roster ticks
+HOT_PER_TICK = 25         # max hot (non-member/unknown) users re-checked per tick
+SWEEP_TICKS = 250         # ~ full sweep every 250 ticks (~25 min)
+MEMBERS_COMMIT_GAP = 15.0    # s, min gap between members.json commits
+ROSTER_COMMIT_GAP = 1200.0   # s, min gap between roster.enc commits (20 min)
+ROSTER_NEW_IDS_FLUSH = 8     # commit roster.enc early when this many new ids
 
 TG_API = "https://api.telegram.org"
 UA = {"User-Agent": "JadvalakGateway/1.0"}
@@ -125,6 +174,8 @@ _member_cache: dict = {}          # user_id -> (allowed, ts)
 _checker_idx: int = 0             # which checker token works
 _gate_broken_notified: set = set()
 _pinned_chats: set = set()        # chats whose game-button message we pinned
+_gh_lock = threading.Lock()       # serialises Contents-API writes
+_control_grace: int = 0           # epoch until which the app lets unknowns in
 
 # ---- stats state ----
 _seen_users: set = set()          # salted hashes of counted player ids
@@ -180,23 +231,31 @@ def count_user(uid: int) -> None:
 
 
 def _gh_put(path: str, obj, msg: str) -> bool:
+    """Thread-safe Contents-API write (stats main loop AND roster thread both
+    use it). GET current sha -> PUT; on conflict/failure one retry with a
+    fresh sha. Never raises."""
     if not GH_TOKEN:
         return False
     headers = {"Authorization": f"token {GH_TOKEN}",
                "Accept": "application/vnd.github+json",
                "User-Agent": "jadvalak-stats"}
     url = f"https://api.github.com/repos/{STATS_REPO}/contents/{path}"
-    try:
-        get = requests.get(f"{url}?ref=main", headers=headers, timeout=30)
-        body = {"message": msg, "branch": "main",
-                "content": base64.b64encode(
-                    json.dumps(obj, ensure_ascii=False).encode()).decode()}
-        if get.status_code == 200:
-            body["sha"] = get.json()["sha"]
-        put = requests.put(url, headers=headers, json=body, timeout=30)
-        return put.status_code in (200, 201)
-    except requests.RequestException as exc:
-        log.warning("stats put %s failed: %s", path, exc)
+    data = base64.b64encode(
+        json.dumps(obj, ensure_ascii=False).encode()).decode()
+    with _gh_lock:
+        for attempt in (1, 2):
+            try:
+                get = requests.get(f"{url}?ref=main", headers=headers, timeout=30)
+                body = {"message": msg, "branch": "main", "content": data}
+                if get.status_code == 200:
+                    body["sha"] = get.json()["sha"]
+                put = requests.put(url, headers=headers, json=body, timeout=30)
+                if put.status_code in (200, 201):
+                    return True
+                log.warning("gh put %s attempt %d -> %s %s", path, attempt,
+                            put.status_code, put.text[:160])
+            except requests.RequestException as exc:
+                log.warning("gh put %s failed: %s", path, exc)
         return False
 
 
@@ -315,6 +374,272 @@ def is_member(user_id: int) -> bool | None:
         except requests.RequestException as exc:
             log.warning("checker token #%d request failed: %s", idx, exc)
     return result
+
+
+# --------------------------------------------------------------------------- #
+#  Live membership roster (public data/members.json maintained here)            #
+# --------------------------------------------------------------------------- #
+# The roster thread keeps getChatMember results for every user we know and
+# publishes the salted hashes of CURRENT members so the mini app can gate
+# itself without any backend. Two freshness tiers (see docstring):
+#   hot   — unknown/non-member users, re-checked every tick (~6 s)
+#   sweep — everyone, oldest check first, a full pass every ~25 min
+
+_roster: dict = {}                 # uid -> {"m": bool|None, "ts": epoch, "seen": epoch}
+_roster_lock = threading.Lock()
+_roster_hot_cursor = 0
+_roster_new_ids = 0
+_roster_last_save = 0.0
+_members_last_commit = 0.0
+_members_last_hashes: frozenset = frozenset()
+_members_last_grace: int = -1
+
+
+def member_hash(uid: int) -> str:
+    """Salted, truncated id hash — IDENTICAL to the mini app's computation
+    (sha256(MEMBER_SALT + ":" + id), first 16 hex chars)."""
+    return hashlib.sha256(
+        f"{MEMBER_SALT}:{uid}".encode()).hexdigest()[:16]
+
+
+def _roster_key() -> bytes:
+    """roster.enc encryption key — derived from the bot token (GitHub Secret),
+    so the public repo never stores plaintext ids."""
+    return hashlib.sha256(("jadvalak-roster:" + BOT_TOKEN).encode()).digest()
+
+
+def _xor_stream(data: bytes) -> bytes:
+    """HMAC-SHA256 in counter mode as a keystream (encrypt == decrypt)."""
+    key = _roster_key()
+    out = bytearray(len(data))
+    for blk in range(0, len(data), 32):
+        ks = hmac.new(key, str(blk // 32).encode(), hashlib.sha256).digest()
+        chunk = data[blk:blk + 32]
+        for i, b in enumerate(chunk):
+            out[blk + i] = b ^ ks[i]
+    return bytes(out)
+
+
+def _roster_encrypt(obj) -> str:
+    raw = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode()
+    return base64.b64encode(_xor_stream(raw)).decode()
+
+
+def _roster_decrypt(text: str):
+    try:
+        raw = _xor_stream(base64.b64decode(text.strip()))
+        obj = json.loads(raw.decode())
+        if isinstance(obj, dict):
+            return obj
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def roster_load() -> None:
+    """Seed the roster from the run checkout, preferring the freshest
+    roster.enc from raw.githubusercontent when reachable (the chained run's
+    checkout can be several hours old)."""
+    global _roster_new_ids, _roster_last_save
+    best = None
+    try:
+        local = _roster_decrypt(Path(ROSTER_PATH).read_text(encoding="utf-8"))
+        if local:
+            best = local
+    except OSError:
+        pass
+    try:
+        r = requests.get(RAW_BASE + ROSTER_PATH + f"?t={int(time.time())}",
+                         headers=UA, timeout=(10, 20))
+        if r.status_code == 200:
+            remote = _roster_decrypt(r.text)
+            if remote and (not best or remote.get("saved", 0) > best.get("saved", 0)):
+                best = remote
+    except requests.RequestException:
+        pass
+    if not best:
+        log.info("roster: empty (cold start) — members.json starts fresh")
+        return
+    ids = best.get("ids") or {}
+    if not isinstance(ids, dict):
+        return
+    with _roster_lock:
+        for uid_s, st in ids.items():
+            try:
+                _roster[int(uid_s)] = {
+                    "m": st.get("m"),          # None -> needs a check
+                    "ts": float(st.get("ts") or 0),
+                    "seen": float(st.get("seen") or 0),
+                }
+            except (ValueError, TypeError):
+                continue
+    _roster_new_ids = 0
+    _roster_last_save = time.time()
+    log.info("roster: loaded %d known users (%d currently member)",
+             len(_roster), sum(1 for v in _roster.values() if v.get("m")))
+
+
+def roster_save(force: bool = False) -> bool:
+    """Persist the encrypted id roster (throttled; early-flush when many new
+    ids arrived; forced at run end). Best-effort — a failure retries on a
+    later tick."""
+    global _roster_last_save, _roster_new_ids
+    now = time.time()
+    if (not force and now - _roster_last_save < ROSTER_COMMIT_GAP
+            and _roster_new_ids < ROSTER_NEW_IDS_FLUSH):
+        return False
+    if not GH_TOKEN:
+        return False
+    with _roster_lock:
+        payload = {"saved": int(now), "ids": {
+            str(uid): {"m": st.get("m"), "ts": int(st.get("ts") or 0),
+                       "seen": int(st.get("seen") or 0)}
+            for uid, st in _roster.items()}}
+    ok = _gh_put(ROSTER_PATH, {"enc": _roster_encrypt(payload)},
+                 "chore(roster): encrypted user ids [skip ci]")
+    if ok:
+        _roster_last_save = now
+        _roster_new_ids = 0
+        log.info("roster: saved %d ids (encrypted)", len(payload["ids"]))
+    return ok
+
+
+def roster_touch(uid: int, member: bool | None = None) -> None:
+    """Record that we just saw this user (and optionally a fresh membership
+    verdict). New ids flag an early roster_save."""
+    global _roster_new_ids
+    with _roster_lock:
+        st = _roster.get(uid)
+        if st is None:
+            _roster_new_ids += 1
+            st = {"m": None, "ts": 0.0, "seen": 0.0}
+            _roster[uid] = st
+        st["seen"] = time.time()
+        if member is not None:
+            st["m"] = bool(member)
+            st["ts"] = st["seen"]
+
+
+def check_member_raw(uid: int) -> bool | None:
+    """Direct getChatMember (no 90 s cache) — used by the roster thread.
+    Also refreshes the shared cache so chat replies benefit."""
+    global _checker_idx
+    for i in range(len(CHECKER_TOKENS)):
+        idx = (_checker_idx + i) % len(CHECKER_TOKENS)
+        token = CHECKER_TOKENS[idx]
+        try:
+            r = requests.get(
+                f"{TG_API}/bot{token}/getChatMember",
+                params={"chat_id": GATE_CHAT_ID, "user_id": uid},
+                headers=UA, timeout=(15, 30),
+            )
+            if r.status_code == 200 and r.json().get("ok"):
+                status = (r.json().get("result") or {}).get("status", "")
+                _checker_idx = idx
+                res = status in ("creator", "administrator", "member", "restricted")
+                _member_cache[uid] = (res, time.time())
+                return res
+        except (requests.RequestException, ValueError):
+            continue
+    return None
+
+
+def _roster_apply(uid: int, result: bool | None) -> None:
+    """Store a check result; None (check failed) keeps the previous value."""
+    if result is None:
+        return
+    with _roster_lock:
+        st = _roster.setdefault(uid, {"m": None, "ts": 0.0, "seen": 0.0})
+        st["m"] = bool(result)
+        st["ts"] = time.time()
+    _member_cache[uid] = (bool(result), time.time())
+
+
+def _roster_next_batch() -> list:
+    """Which ids to check this tick: hot (unknown/non-member, freshest-seen
+    first, rotating window) + sweep (oldest check first, active users first)."""
+    global _roster_hot_cursor
+    now = time.time()
+    with _roster_lock:
+        items = list(_roster.items())
+    hot = [(uid, st) for uid, st in items if not st.get("m")]
+    hot.sort(key=lambda kv: -(kv[1].get("seen") or 0))
+    if len(hot) > HOT_PER_TICK:
+        start = _roster_hot_cursor % len(hot)
+        _roster_hot_cursor = (_roster_hot_cursor + HOT_PER_TICK) % len(hot)
+        window = hot[start:start + HOT_PER_TICK] + hot[:max(0, start + HOT_PER_TICK - len(hot))]
+    else:
+        window = hot
+    batch = max(2, -(-len(items) // SWEEP_TICKS))
+    # sweep pool: users WITH a verdict (unknowns are already covered by the
+    # hot window — giving them sweep slots would starve stale re-checks)
+    known = [kv for kv in items if kv[1].get("m") is not None]
+    sweep = sorted(known, key=lambda kv: (
+        (kv[1].get("seen") or 0) < now - 86400,     # active users first
+        kv[1].get("ts") or 0,                        # then oldest check
+    ))[:batch]
+    out, seen = [], set()
+    for uid, _ in window + sweep:
+        if uid not in seen:
+            seen.add(uid)
+            out.append(uid)
+    return out
+
+
+def members_payload() -> dict:
+    with _roster_lock:
+        hashes = sorted(member_hash(uid) for uid, st in _roster.items() if st.get("m"))
+    return {"v": 2, "n": len(hashes), "members": hashes,
+            "grace_until": _control_grace,
+            "updated": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
+
+
+def members_commit(force: bool = False) -> bool:
+    """Publish data/members.json — when the member set OR the grace value
+    changed (or forced right after a chat verification). The client always
+    fetches it cache-busted from raw.githubusercontent, so a Pages rebuild is
+    never on the critical path."""
+    global _members_last_commit, _members_last_hashes, _members_last_grace
+    payload = members_payload()
+    new_hashes = frozenset(payload["members"])
+    now = time.time()
+    if not force:
+        if (new_hashes == _members_last_hashes
+                and payload["grace_until"] == _members_last_grace):
+            return False
+        if now - _members_last_commit < MEMBERS_COMMIT_GAP:
+            return False           # changed but throttled — retried next tick
+    if not GH_TOKEN:
+        return False
+    ok = _gh_put(MEMBERS_PATH, payload, "chore(roster): members.json [skip ci]")
+    _members_last_commit = now
+    if ok:
+        _members_last_hashes = new_hashes
+        _members_last_grace = payload["grace_until"]
+        log.info("roster: members.json committed — %d members (grace=%d)",
+                 payload["n"], payload["grace_until"])
+    return ok
+
+
+def roster_loop() -> None:                       # daemon thread — never dies
+    log.info("roster: thread alive (hot=%ss sweep≈%dm)",
+             int(HOT_INTERVAL), int(SWEEP_TICKS * HOT_INTERVAL / 60))
+    first = True
+    while True:
+        try:
+            if GATE_CHAT_ID and CHECKER_TOKENS:
+                if first:
+                    # cold start: make sure data/members.json EXISTS on main
+                    # (with the current grace window) even with an empty roster
+                    members_commit(force=True)
+                    first = False
+                for uid in _roster_next_batch():
+                    _roster_apply(uid, check_member_raw(uid))
+                members_commit()
+            roster_save()
+        except Exception as exc:                 # absolutely never crash the bot
+            log.warning("roster tick crashed (ignored): %s", exc)
+        time.sleep(HOT_INTERVAL)
 
 
 # --------------------------------------------------------------------------- #
@@ -438,6 +763,7 @@ def kb_app(user_id: int) -> dict:
 def handle_start(chat_id: int, user_id: int, first: bool):
     count_user(user_id)
     member = is_member(user_id)
+    roster_touch(user_id, member)     # roster learns the id + fresh verdict
     set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member is None:
         # no checker bot has channel access — fail CLOSED with an explanation
@@ -448,7 +774,10 @@ def handle_start(chat_id: int, user_id: int, first: bool):
         ))
         return
     if member:
-        # verified HERE in the chat — only now does the mini app open
+        # verified HERE in the chat — only now does the mini app open.
+        # Publish the roster right away so the button we are about to send
+        # opens instantly (no gate flash) in the mini app.
+        members_commit(force=True)
         mid = send(chat_id, welcome_text() if first else "بیا داخل! 🎮", kb_app(user_id))
         pin_message(chat_id, mid)
     else:
@@ -461,12 +790,16 @@ def handle_joined(cb) -> None:
     message_id = cb["message"]["message_id"]
     count_user(user_id)
     member = is_member(user_id)
+    roster_touch(user_id, member)     # roster learns the id + fresh verdict
     set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member is None:
         answer_cb(cb["id"], "بررسی عضویت موفق نبود؛ چند لحظه بعد دوباره بزن.")
         return
     if member:
-        # verified HERE in the chat — only now does the mini app open
+        # verified HERE in the chat — only now does the mini app open.
+        # Push the roster out immediately: the user may already be staring
+        # at the mini app's gate screen, whose auto-poll will flip them in.
+        members_commit(force=True)
         answer_cb(cb["id"], "✅ خوش اومدی! دکمهٔ «ورود به جدولک» تازه شد.")
         edit_message(chat_id, message_id, welcome_text(), kb_app(user_id))
         pin_message(chat_id, message_id)
@@ -488,6 +821,7 @@ def handle_update(upd: dict) -> None:
         user_id = user.get("id")
         if msg["chat"].get("type") != "private" or not user_id:
             return
+        roster_touch(user_id)           # any interaction heals the cold-start roster
         text = (msg.get("text") or "").strip()
         if text.startswith("/start"):
             handle_start(chat_id, user_id, first=True)
@@ -505,6 +839,7 @@ def handle_update(upd: dict) -> None:
             handle_start(chat_id, user_id, first=False)
     elif "callback_query" in upd:
         cb = upd["callback_query"]
+        roster_touch(cb.get("from", {}).get("id"))   # seen (verdict comes in handler)
         if cb.get("data") == "joined":
             handle_joined(cb)
 
@@ -514,10 +849,25 @@ def handle_update(upd: dict) -> None:
 # --------------------------------------------------------------------------- #
 
 def gateway_enabled() -> bool:
+    """Kill switch + grace window, both served from control.json in the repo:
+      {"gateway": "on", "grace_until": 1760000000}
+    grace_until is copied into members.json — during that window the mini app
+    still admits players that are not in the roster yet (cold start)."""
+    global _control_grace
     try:
         r = requests.get(CONTROL_URL, headers=UA, timeout=(10, 20))
         if r.status_code == 200:
-            return "off" not in (r.text or "").strip().lower()
+            try:
+                ctrl = json.loads(r.text or "{}")
+            except ValueError:
+                ctrl = {}
+            if isinstance(ctrl, dict):
+                try:
+                    _control_grace = int(ctrl.get("grace_until") or 0)
+                except (ValueError, TypeError):
+                    _control_grace = 0
+                return "off" not in str(ctrl.get("gateway", "on")).lower()
+            return True  # non-dict body -> assume on
         return True  # unreachable control file -> assume on
     except requests.RequestException:
         return True
@@ -586,12 +936,15 @@ def main() -> int:
     deadline = time.time() + RUNTIME_MINUTES * 60
     conflicts = 0
     stats_load()
+    roster_load()
+    threading.Thread(target=roster_loop, daemon=True, name="roster").start()
     log.info("polling for %.0f minutes (start offset=%d)", RUNTIME_MINUTES, offset)
 
     while time.time() < deadline:
         if not gateway_enabled():
             log.info("control.json says OFF — stopping without chaining")
             maybe_commit_stats(force=True)
+            roster_save(force=True)
             Path_flag = open("chain_flag.txt", "w")
             Path_flag.write("no-chain")
             Path_flag.close()
@@ -606,6 +959,7 @@ def main() -> int:
             if conflicts >= 12:
                 log.info("yielding to the other poller")
                 maybe_commit_stats(force=True)
+                roster_save(force=True)
                 with open("chain_flag.txt", "w") as fh:
                     fh.write("no-chain")
                 with open("chain_offset.txt", "w") as fh:
@@ -621,8 +975,9 @@ def main() -> int:
                 log.error("update handler crashed: %s", exc)
         maybe_commit_stats()
 
-    # runtime exhausted — flush stats, then hand the offset to the next chained run
+    # runtime exhausted — flush stats + roster, then hand the offset to the next chained run
     maybe_commit_stats(force=True)
+    roster_save(force=True)
     with open("chain_flag.txt", "w") as fh:
         fh.write("chain")
     with open("chain_offset.txt", "w") as fh:
