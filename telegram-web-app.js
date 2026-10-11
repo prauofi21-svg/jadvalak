@@ -1,3 +1,81 @@
+/* ================= jadvalak legacy bridge (v2.8, 2026-10-11) =================
+   WHY THIS EXISTS: Telegram's WebView serves mini-app HTML from a cache that
+   can be WEEKS old, keyed on the full URL. Every «ورود به جدولک» button on
+   every welcome message a member ever received stays clickable forever, and
+   the pre-2026.10.08 builds those old URLs load (a) never self-heal to the
+   latest code and (b) admit anyone holding a signed ?st= access token —
+   issued back when they WERE a channel member, valid up to 30 days — or a
+   saved jk:st:<uid> localStorage token, with NO live membership check at
+   all. That is exactly the owner's recurring bug: «لغو عضویت + دکمهٔ قدیمی
+   پیام خوشامدگویی → جدولک باز می‌شود».
+   This file is the ONE subresource every historical build (2026-09-22 →
+   today) loads BEFORE its own inline code runs, so it is the only channel
+   that can reach those frozen pages. On every load it:
+     1. purges the legacy jk:st:* localStorage tokens — the st hole dies;
+     2. fast-path: if the page URL's ?v= equals BRIDGE_V (this deploy), it
+        does nothing at all — zero fetches, zero visual cost for fresh
+        buttons;
+     3. otherwise (no v param = pre-Oct-08 legacy URL, or an outdated v) it
+        hides the document, fetches version.json FRESH (cache-busted,
+        no-store), and on a mismatch location.replace()s the same URL with
+        the new v swapped in place — BEFORE the legacy page can boot its
+        st gate. The current gated build (live getChatMember check) loads.
+   Fail-open everywhere: on match, timeout (1.6 s) or any error the page is
+   simply restored and runs exactly as before — this must never break the
+   app. The redirect is idempotent (v swapped in place, every other param
+   and the hash survive), so it can never loop. ?nobridge=1 skips it (test
+   hook). Keep BRIDGE_V in sync with version.json on every deploy. */
+var JK_BRIDGE_V = "2026.10.11.5";
+(function jkLegacyBridge() {
+  try {
+    if (/[?&]nobridge=1\b/.test(location.search)) { return; }
+    /* 1 — kill the legacy token store in every build that loads this file */
+    try {
+      var dead = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('jk:st:') === 0) { dead.push(k); }
+      }
+      for (var j = 0; j < dead.length; j++) {
+        try { localStorage.removeItem(dead[j]); } catch (e) {}
+      }
+    } catch (e) {}
+    /* 2 — fast path: fresh button for the current deploy, nothing to do */
+    try {
+      var qs = new URLSearchParams(location.search);
+      if (qs.get('v') === JK_BRIDGE_V) { return; }
+    } catch (e) {}
+    /* 3 — possibly-stale page: hide it while we check, redirect if behind */
+    var root = document.documentElement;
+    var done = false;
+    var restore = function () {
+      if (done) { return; }
+      done = true;
+      try { root.style.visibility = ''; } catch (e) {}
+    };
+    try { root.style.visibility = 'hidden'; } catch (e) {}
+    try {
+      var vv = null;
+      try { vv = new URLSearchParams(location.search).get('v'); } catch (e) {}
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (v) {
+          if (v && v.v && vv !== v.v) {
+            try {
+              var p = new URLSearchParams(location.search);
+              p.set('v', v.v);
+              location.replace(location.pathname + '?' + p.toString() + location.hash);
+            } catch (e) { restore(); }
+          } else {
+            restore();
+          }
+        })
+        .catch(restore);
+      setTimeout(restore, 1600);
+    } catch (e) { restore(); }
+  } catch (e) {}
+})();
+
 // WebView
 (function () {
   var eventHandlers = {};
