@@ -338,10 +338,9 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 <!-- ============ channel-membership gate (v2.4) ============ -->
 <div id="gate" class="screen" hidden>
   <div class="logo">🧩</div>
-  <h2>جدولک برای اعضای کانال است</h2>
   <p>برای بازی، عضو کانال دانشنامهٔ علمی <b>@daily_sciences</b> شو. بعد از عضویت، همین صفحه خودکار وارد بازی می‌شود — نیازی به هیچ کار دیگری نیست.</p>
   <button class="btn" id="btn-join">📢 عضویت در کانال</button>
-  <button class="btn ghost" id="btn-gate-bot">🤖 قبلاً عضو هستی؟ یک‌بار از ربات وارد شو</button>
+  <button class="btn ghost" id="btn-gate-bot">🤖 هنوز باز نشد؟ یک‌بار از ربات وارد شو</button>
   <p class="gate-wait" id="gate-wait"><i class="gatedot"></i>در حال بررسی خودکار عضویت…</p>
 </div>
 
@@ -465,7 +464,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.11.2";
+const APP_V = "2026.10.11.3";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -486,28 +485,27 @@ let bootGate = Promise.resolve();
   }catch(e){}
 })();
 
-/* ================= channel membership (2026-10-11 v2.5) =================
+/* ================= channel membership (2026-10-11 v2.6) =================
    The app gates itself against data/members.json — a roster the gateway
-   bot keeps publishing from REAL getChatMember checks:
-     v3 "members" — salted id hashes of CURRENT channel members
-     v3 "left"    — salted hashes of KNOWN non-members (leavers!). A hash in
-                    `left` is a hard block that the grace window can NOT
-                    override — the fix for «کانال را ترک کرده اما جدولک هنوز
-                    برایش باز می‌شود»: a known leaver is gated the moment the
-                    bot's sweep flips them (≈ a minute), even mid-game.
-     "grace_until"— cold-start window that admits only GENUINELY unknown
-                    users (in neither list) while the roster bootstraps.
-     member      -> straight into the game, zero friction, one window
-     non-member  -> ONE quiet join screen; it AUTO-POLLS the roster, so the
-                    moment the user joins the channel the game opens by
-                    itself (usually < ~15 s). Nothing is ever sent to the
-                    user — no bot messages, no second window, no «پیام مزاحم».
-   While the game is up, a quiet re-verification runs every ~50 s (and on
-   every return to foreground) so a player who LEAVES the channel is landed
-   on the join screen within about a minute — progress is flushed first and
-   the game resumes exactly where it was the moment they rejoin.
+   bot keeps publishing from REAL getChatMember checks. The gateway's
+   roster tick is now ~2.5 s (every known user every tick at the current
+   scale), so BOTH directions are near-real-time:
+     - a player who LEAVES the channel is landed on this gate screen
+       within seconds (quiet re-verification every ~7 s + on every return
+       to foreground, with progress flushed first);
+     - a player who JOINS from this screen is auto-admitted within ~5-10 s
+       (brisk 1.8 s polling picks up the roster flip the moment the
+       gateway commits it) — no tap, no second window, no bot message.
+   v3 "members" — salted id hashes of CURRENT channel members
+   v3 "left"    — salted hashes of KNOWN non-members (leavers!). A hash in
+                  `left` is a hard block that the grace window can NOT
+                  override.
+   "grace_until"— cold-start window that admits only GENUINELY unknown
+                  users (in neither list) while the roster bootstraps.
+   Failures never gate: a fetch that fails entirely fails OPEN, and the
+   periodic re-checks keep retrying in the background.
    The fetch is kicked off HERE so it runs in parallel with the version
-   self-heal wait — the verdict costs members zero extra boot time. */
+   self-heal wait — the verdict costs members ~zero extra boot time. */
 const CHANNEL_URL = "https://t.me/daily_sciences";
 const MEMBER_SALT = "2adeb51be375c1ab70e971569537f425";   /* == bot MEMBER_SALT */
 const MEMBERS_URL = window.JK_MEMBERS_URL ||
@@ -515,23 +513,30 @@ const MEMBERS_URL = window.JK_MEMBERS_URL ||
 let gateActive = false, gateBound = false, gameStarted = false, gameReady = false;
 
 async function fetchMembers(){
-  const bases = [MEMBERS_URL, "data/members.json"];
+  /* v2.6: raw.githubusercontent FIRST with a TIGHT 1.4 s budget — it is
+     the freshest copy (verdict flips land there seconds after the gateway
+     commits), while the same-origin Pages mirror can lag a Pages rebuild.
+     The same-origin fetch is the fallback for networks where raw is
+     blocked (common in Iran): it never pays the full serial timeout any
+     more. Every attempt is cache-busted. */
   for(let round=0; round<2; round++){
-    for(const base of bases){
-      const url = base + (base.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
-      const ctrl = new AbortController();
-      const t = setTimeout(()=>ctrl.abort(), 2500);
-      try{
-        const res = await fetch(url, {cache:"no-store", signal:ctrl.signal});
-        clearTimeout(t);
-        if(res.ok){
-          const m = await res.json();
-          if(m && Array.isArray(m.members)) return m;
-        }
-      }catch(e){ clearTimeout(t); }
-    }
+    const raw = await fetchJSON(MEMBERS_URL, 1400);
+    if(raw) return raw;
+    const same = await fetchJSON("data/members.json", 2500);
+    if(same) return same;
   }
   return null;
+}
+function fetchJSON(base, ms){
+  const url = base + (base.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
+  return new Promise(resolve=>{
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>{ try{ ctrl.abort(); }catch(e){} resolve(null); }, ms);
+    fetch(url, {cache:"no-store", signal:ctrl.signal})
+      .then(r => r.ok ? r.json() : null)
+      .then(m => { clearTimeout(t); resolve(m && Array.isArray(m.members) ? m : null); })
+      .catch(()=>{ clearTimeout(t); resolve(null); });
+  });
 }
 async function memberHash(uid){
   try{
@@ -582,10 +587,12 @@ async function gatePollLoop(){
     const v = await membershipVerdict();
     if(v === "yes" || v === "grace"){ gateResolve(); return; }
     n++;
-    /* 2.2 s right after joining, 4.2 s for the first minute, then 8 s;
-       a hidden WebView backs off so we never drain the battery */
+    /* v2.6: with the gateway's 2.5 s roster tick a join is usually detected
+       within ~5-10 s; poll briskly (1.8 s, then 3.5 s) so the moment the
+       roster flips, this page opens the game by itself. A hidden WebView
+       backs off so we never drain the battery */
     await new Promise(r=>setTimeout(r,
-      document.hidden ? 9000 : (n < 10 ? 2200 : n < 25 ? 4200 : 8000)));
+      document.hidden ? 6000 : (n < 12 ? 1800 : 3500)));
   }
 }
 function gateResolve(){
@@ -1488,9 +1495,10 @@ async function startGame(){
     }catch(e){}
   }, 900);
   gameReady = true;               /* v2.4: safe for a late gate to appear/resolve */
-  setInterval(quietRecheck, 50000);        /* v2.5: leaver landed within ~a minute */
+  setTimeout(quietRecheck, 2500);          /* v2.6: first fresh recheck right after boot */
+  setInterval(quietRecheck, 7000);         /* v2.6: leaver landed within seconds */
   document.addEventListener("visibilitychange", ()=>{
-    if(!document.hidden) quietRecheck();   /* v2.5: back-to-foreground re-check */
+    if(!document.hidden) quietRecheck();   /* back-to-foreground re-check */
   });
 }
 
