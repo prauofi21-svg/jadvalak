@@ -340,7 +340,8 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
   <div class="logo">🧩</div>
   <p>برای بازی، عضو کانال دانشنامهٔ علمی <b>@daily_sciences</b> شو. بعد از عضویت، همین صفحه خودکار وارد بازی می‌شود — نیازی به هیچ کار دیگری نیست.</p>
   <button class="btn" id="btn-join">📢 عضویت در کانال</button>
-  <button class="btn ghost" id="btn-gate-bot">🤖 هنوز باز نشد؟ یک‌بار از ربات وارد شو</button>
+  <button class="btn ghost" id="btn-recheck">🔄 بررسی دوبارهٔ عضویت</button>
+  <button class="btn ghost" id="btn-gate-bot">🤖 هنوز باز نشد؟ در چت ربات، دکمهٔ «بررسی دوبارهٔ عضویت» را بزن</button>
   <p class="gate-wait" id="gate-wait"><i class="gatedot"></i>در حال بررسی خودکار عضویت…</p>
 </div>
 
@@ -421,7 +422,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۲٫۹</div>
+    <div class="ver">جدولک نسخه ۲٫۱۰</div>
   </div>
 </div>
 
@@ -442,6 +443,11 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 /* ================= Telegram ================= */
 const TG = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 const BOT_LINK = "https://t.me/jadvalak_bot";
+/* v2.10: the gate's bot fallback uses the deep link — for a bot the user
+   has NOT started yet it auto-sends /start check (live verify + fresh game
+   button right away); for an already-started bot it simply opens the chat,
+   where the pinned message carries «بررسی دوبارهٔ عضویت». */
+const BOT_CHECK_LINK = "https://t.me/jadvalak_bot?start=check";
 const ABOUT_LINK = "https://t.me/factcaster";
 const SHARE_URL = "https://t.me/share/url?url=" + encodeURIComponent(BOT_LINK) +
   "&text=" + encodeURIComponent("🧩 جدولک — هر روز ۱۰ جدول کلمات متقاطع فارسی! بیا بازی کنیم 🎮");
@@ -472,7 +478,7 @@ function tgReady(){
    legacy ?st= token gate can admit a channel-leaver. This inline self-heal
    remains as the second layer for any page whose cached JS is itself
    stale. */
-const APP_V = "2026.10.12.1";
+const APP_V = "2026.10.12.2";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -542,21 +548,73 @@ const MEMBERS_URL = window.JK_MEMBERS_URL ||
 const CHECKER_API = window.JK_CHECKER_API ||
   "https://api.telegram.org/bot8886650266:AAFlpeBtEGlSWvV12EvbnMHfMvsswoxnH3U/getChatMember";
 const CHECKER_CHAT = "@daily_sciences";
+/* v2.10: a THIRD roster source — the GitHub contents API reads the repo
+   LIVE (no CDN edge on the API path; verified 2026-10-11: CORS *, ETag
+   exposed, If-None-Match allowed and the preflight cached 24 h). raw edges
+   hold bodies ~5 min even cache-busted and the Pages mirror lags the site
+   rebuild, so the API is the freshest readable copy — a sweep flip becomes
+   visible to the gate poll within ~10-15 s even for users who cannot reach
+   api.telegram.org. ETag conditional requests that return 304 do NOT count
+   against the unauthenticated rate limit, so the 1.8 s poll is essentially
+   free; on 403 (quota gone — shared CGNAT IPs) the source backs off 10 min
+   and raw/Pages decide. JK_GH_API is the offline-suite test hook. */
+const GH_API_URL = window.JK_GH_API ||
+  "https://api.github.com/repos/prauofi21-svg/jadvalak/contents/data/members.json";
 let gateActive = false, gateBound = false, gameStarted = false, gameReady = false;
 
+let _ghEtag = null, _ghCopy = null, _ghDeadUntil = 0;
+function ghMembers(ms){
+  /* v2.10 fresh source. 304 keeps the previous copy (and is FREE — it
+     does not burn the 60/h unauthenticated quota, which matters behind
+     shared CGNAT IPs); 403 = quota exhausted -> disable for 10 min;
+     everything else that fails -> null (raw/Pages still decide). The
+     manual re-check button clears _ghEtag to force one full 200. */
+  if(Date.now() < _ghDeadUntil) return Promise.resolve(null);
+  return new Promise(resolve=>{
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>{ try{ ctrl.abort(); }catch(e){} resolve(null); }, ms);
+    const headers = { "Accept": "application/vnd.github+json" };
+    if(_ghEtag) headers["If-None-Match"] = _ghEtag;
+    fetch(GH_API_URL, { cache: "no-store", signal: ctrl.signal, headers })
+      .then(r => {
+        if(r.status === 304){ clearTimeout(t); resolve(_ghCopy); return; }
+        if(r.status === 403){
+          clearTimeout(t); _ghDeadUntil = Date.now() + 600000; resolve(null); return;
+        }
+        if(!r.ok){ clearTimeout(t); resolve(null); return; }
+        const et = r.headers.get("ETag");
+        r.json().then(obj => {
+          clearTimeout(t);
+          try{
+            if(et) _ghEtag = et;
+            const b64 = String((obj || {}).content || "").replace(/\s+/g, "");
+            const bin = atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const m = JSON.parse(new TextDecoder().decode(bytes));
+            _ghCopy = (m && Array.isArray(m.members)) ? m : null;
+            resolve(_ghCopy);
+          }catch(e){ resolve(null); }
+        }).catch(()=>{ clearTimeout(t); resolve(null); });
+      })
+      .catch(()=>{ clearTimeout(t); resolve(null); });
+  });
+}
+
 async function fetchMembers(){
-  /* v2.9: fire BOTH sources in parallel and keep the copy with the NEWER
-     `updated` stamp. The raw CDN can serve a minutes-old copy even
-     cache-busted (origin max-age=300 — a leave-flip needs up to ~5 min to
-     reach some edges), while the same-origin Pages mirror lags the Pages
-     rebuild (~1-2 min) instead. Whichever propagated first wins, so the
-     effective roster lag is the MINIMUM of the two — and on networks
-     where raw is blocked entirely (common in Iran) the same-origin copy
-     alone still decides. Every attempt is cache-busted. */
+  /* v2.9/v2.10: fire raw + the same-origin Pages mirror + the LIVE GitHub
+     contents API in parallel and keep the copy with the NEWER `updated`
+     stamp. raw edges serve minutes-old bodies even cache-busted (origin
+     max-age=300) and the Pages mirror lags the site rebuild (~1-2 min);
+     the API source is seconds-fresh, so the effective roster lag is the
+     MINIMUM of the three — and on networks where raw is blocked entirely
+     (common in Iran) the same-origin copy alone still decides. Every raw/
+     Pages attempt is cache-busted; the API attempt revalidates via ETag. */
   for(let round=0; round<2; round++){
     const copies = await Promise.all([
       fetchJSON(MEMBERS_URL, 1600),
       fetchJSON("data/members.json", 2600),
+      ghMembers(1500),
     ]);
     const ok = copies.filter(Boolean);
     if(ok.length)
@@ -584,6 +642,62 @@ async function memberHash(uid){
   }catch(e){ return null; }
 }
 
+/* v2.10: the bot issues a signed ?st= token ONLY after verifying membership
+   LIVE in the chat (getChatMember from the gateway runner, where Telegram is
+   always reachable — the flow that saved the owner in the field). A token on
+   THIS page's URL (or remembered from the last verified entry) therefore
+   means "the bot vouched for me within the TTL" and the user walks straight
+   into the game — no roster copy on the critical path, zero false gates for
+   just-verified members. The token format is uid.iat.exp.sig (4 segments,
+   lifetime ≤ ~24 h): the OLD 3-segment 30-day tokens from pre-Oct-8 welcome
+   messages are structurally rejected, so the legacy-button hole stays shut.
+   The signature itself cannot be verified client-side (that would leak the
+   bot secret), so a forged token only ever buys a few seconds — the
+   continuous re-check demotes on any FRESH «no» (direct check always; roster
+   copies published AFTER the token was issued), and the expiry caps it. */
+const ST_TTL_MS = 24 * 3600 * 1000;
+let stVerified = null;                 /* {issued} while a bot-vouched session is live */
+function readStToken(uid){
+  const grab = raw => {
+    try{
+      const p = String(raw || "").split(".");
+      if(p.length !== 4) return null;              /* v2.10 format only — legacy 3-part tokens are dead on arrival */
+      const u = parseInt(p[0], 10), iat = parseInt(p[1], 10) * 1000,
+            exp = parseInt(p[2], 10) * 1000;
+      if(!isFinite(u) || !isFinite(iat) || !isFinite(exp) || u !== uid) return null;
+      if(exp - iat > 25 * 3600 * 1000) return null; /* only short-lived bot tokens count */
+      if(exp <= Date.now() || iat > Date.now() + 300000) return null;
+      return { uid: u, iat: iat, exp: exp, raw: raw };
+    }catch(e){ return null; }
+  };
+  const fromUrl = grab(new URLSearchParams(location.search).get("st"));
+  if(fromUrl) return fromUrl;
+  try{
+    const stored = localStorage.getItem("jk:memb:" + uid);
+    return stored ? grab(stored) : null;
+  }catch(e){ return null; }
+}
+function rememberSt(raw){
+  const uid = userId();
+  if(!uid || !raw) return;
+  try{ localStorage.setItem("jk:memb:" + uid, raw); }catch(e){}
+}
+function forgetSt(){
+  const uid = userId();
+  if(!uid) return;
+  try{ localStorage.removeItem("jk:memb:" + uid); }catch(e){}
+}
+/* demotion rule: with a bot-vouched session live, only a FRESH «no» gates —
+   the direct check is always live; a roster copy only counts when it was
+   published AFTER the token was issued (copies older than the verification
+   still carry the pre-join «left» verdict and must never false-gate). */
+function demoteOK(r){
+  if(!stVerified) return true;
+  if(!r) return false;
+  if(r.src === "direct") return true;
+  return (r.updated || 0) > stVerified.issued;
+}
+
 /* v2.7: one LIVE getChatMember round-trip. Semantics verified live
    2026-10-11 against the real API: member/administrator/creator (+restricted
    with is_member) => member; left/kicked => not a member; 400 with
@@ -593,9 +707,12 @@ async function memberHash(uid){
    unavailable -> null, and the caller falls back to the roster. Concurrent
    callers share the in-flight request (poll loop + visibilitychange never
    double-fire), but a settled answer is NEVER reused — every verdict is
-   fresh, which is the whole point of v2.7. */
-let _directInflight = null;
+   fresh, which is the whole point of v2.7. v2.10: three consecutive network
+   failures (typical: Iran without a VPN) back the direct probe off for 45 s
+   so each roster verdict stops paying a 1.6 s timeout first. */
+let _directInflight = null, _directFails = 0, _directDeadUntil = 0;
 function directCheck(uid){
+  if(Date.now() < _directDeadUntil) return Promise.resolve(null);
   if(_directInflight) return _directInflight;
   const url = CHECKER_API + (CHECKER_API.indexOf("?") < 0 ? "?" : "&") +
     "chat_id=" + encodeURIComponent(CHECKER_CHAT) + "&user_id=" + uid;
@@ -621,25 +738,39 @@ function directCheck(uid){
       .catch(()=>{ clearTimeout(t); resolve(null); });
   });
   _directInflight = p;
-  p.then(()=>{ if(_directInflight === p) _directInflight = null; });
+  p.then(ans=>{
+    if(_directInflight === p) _directInflight = null;
+    if(ans === null){
+      _directFails++;
+      if(_directFails >= 3){ _directDeadUntil = Date.now() + 45000; _directFails = 0; }
+    }else{
+      _directFails = 0;
+    }
+  });
   return p;
 }
 
 async function membershipVerdict(prefetched){
+  /* v2.10: returns {v, src, updated} — v is the verdict ("yes" | "no" |
+     "unknown"), src says whether the direct check ("direct", always live) or
+     a roster copy ("roster", stamped `updated`) produced it, and the
+     demoteOK() rule uses that to keep a bot-vouched session immune to
+     pre-verification stale copies while still gating on fresh evidence. */
   const uid = userId();
-  if(!uid) return "unknown";                     /* no Telegram user -> no-tg path anyway */
+  if(!uid) return { v: "unknown", src: null, updated: 0 };
   /* v2.7: REAL-TIME verdict first — the direct answer beats any cached
      roster in both directions and typically arrives in ~0.2-0.5 s. */
   const d = await directCheck(uid);
-  if(d === "yes" || d === "no") return d;
+  if(d === "yes" || d === "no") return { v: d, src: "direct", updated: Date.now() };
   /* fallback: the published roster (members.json) — same as v2.6 */
   const m = await (prefetched || fetchMembers());
-  if(!m) return "unknown";                       /* fetch failed -> fail OPEN */
+  if(!m) return { v: "unknown", src: null, updated: 0 };   /* fetch failed -> fail OPEN */
   const h = await memberHash(uid);
-  if(!h) return "unknown";                       /* ancient WebView w/o crypto.subtle */
-  if(m.members.indexOf(h) >= 0) return "yes";
+  if(!h) return { v: "unknown", src: null, updated: 0 };   /* ancient WebView w/o crypto.subtle */
+  const up = Date.parse(m.updated) || 0;
+  if(m.members.indexOf(h) >= 0) return { v: "yes", src: "roster", updated: up };
   if(Array.isArray(m.left) && m.left.indexOf(h) >= 0)
-    return "no";                                 /* v3: KNOWN leaver — hard block */
+    return { v: "no", src: "roster", updated: up };        /* v3: KNOWN leaver — hard block */
   /* v2.9: the grace window is GONE. It existed for the v2.4 cold-start,
      but it silently admitted ANY user the roster had never seen — the
      owner's test account sailed straight into the game seconds after
@@ -647,20 +778,24 @@ async function membershipVerdict(prefetched){
      genuinely unknown user now meets the gate; one /start in the bot
      chat verifies them LIVE and adds them to the roster forever. A
      failed FETCH still returns "unknown" above and fails open, so
-     members never see a false gate. */
-  return "no";
+     members never see a false gate. v2.10: demoteOK() decides whether a
+     bot-vouched session must still honor this «no». */
+  return { v: "no", src: "roster", updated: up };
 }
 const firstMembersFetch = fetchMembers();
 
 function enterGate(){
   if(gateActive) return;
   gateActive = true;
+  stVerified = null;                    /* v2.10: demoted or plain gate — bot vouch is void from here */
+  forgetSt();
   try{ flushPersist(); }catch(e){}                /* never lose typed letters */
   show("gate");
   if(!gateBound){
     gateBound = true;
     $("btn-join").addEventListener("click", ()=>{ haptic("impact","light"); tgOpen(CHANNEL_URL); });
-    $("btn-gate-bot").addEventListener("click", ()=>{ tgOpen(BOT_LINK); });
+    $("btn-recheck").addEventListener("click", ()=>{ haptic("impact","light"); manualRecheck(); });
+    $("btn-gate-bot").addEventListener("click", ()=>{ tgOpen(BOT_CHECK_LINK); });
     /* returning from the channel preview -> re-check immediately */
     document.addEventListener("visibilitychange", ()=>{
       if(!document.hidden && gateActive) gateCheckNow();
@@ -669,20 +804,42 @@ function enterGate(){
   gatePollLoop();
 }
 async function gateCheckNow(){
-  const v = await membershipVerdict();
-  if(v === "yes" && gateActive) gateResolve();
+  const r = await membershipVerdict();
+  if(r.v === "yes" && gateActive) gateResolve();
+  return r;
+}
+/* v2.10: the button the owner asked for — the same action that saved them
+   in the field («بررسی دوبارهٔ عضویت» in the bot chat), without leaving the
+   mini app. Drops the ETag so the GitHub-API source does one FULL fresh
+   read (a real 200, not a 304) and reports the outcome honestly. */
+async function manualRecheck(){
+  const el = $("gate-wait");
+  if(el) el.textContent = "⏳ در حال بررسی عضویت…";
+  _ghEtag = null;                       /* bypass the 304 fast-path ONCE */
+  const r = await gateCheckNow();
+  if(!gateActive || !el) return;        /* resolved — gateResolve already toasted */
+  if(r && r.v === "no")
+    el.textContent = "❌ هنوز عضویت دیده نشد — عضو شو و چند لحظه بعد دوباره بزن";
+  else if(r && r.v === "unknown")
+    el.textContent = "⚠️ بررسی الان ممکن نشد — چند لحظه بعد دوباره بزن";
+  setTimeout(()=>{
+    if(gateActive && el) el.innerHTML = '<i class="gatedot"></i>در حال بررسی خودکار عضویت…';
+  }, 5000);
 }
 async function gatePollLoop(){
   let n = 0;
   while(gateActive){
-    const v = await membershipVerdict();
-    if(v === "yes"){ gateResolve(); return; }
+    const r = await membershipVerdict();
+    if(r.v === "yes"){ gateResolve(); return; }
     n++;
     /* v2.7: each poll is a LIVE getChatMember — the moment Telegram itself
        registers the join, the very next poll (~1.8 s cycle + ~0.3 s API)
        opens the game by itself. A hidden WebView backs off so we never
-       drain the battery; a failed direct call degrades to the roster. */
-    await new Promise(r=>setTimeout(r,
+       drain the battery; a failed direct call degrades to the roster —
+       v2.10: which now includes the seconds-fresh GitHub-API copy, so the
+       join-flip the sweep commits reaches this poll within ~10-15 s even
+       without a VPN. */
+    await new Promise(r2=>setTimeout(r2,
       document.hidden ? 6000 : (n < 12 ? 1800 : 3500)));
   }
 }
@@ -699,11 +856,15 @@ function gateResolve(){
 /* v2.5: quiet re-verification while the game is up — a player who LEAVES the
    channel is landed on the join screen within ~a minute (no popup, no
    message; progress is flushed by enterGate and the game resumes where it
-   was the moment they rejoin). Fetch failures and unknowns never gate. */
+   was the moment they rejoin). Fetch failures and unknowns never gate.
+   v2.10: demoteOK() — while a bot-vouched session is live, only a FRESH
+   «no» (direct check, or a roster copy newer than the token's issue time)
+   demotes; a stale pre-verification copy saying «left» must never false-gate
+   a member the bot verified seconds ago. */
 function quietRecheck(){
   if(document.hidden || gateActive || !gameReady) return;
   membershipVerdict()
-    .then(v =>{ if(v === "no" && !gateActive) enterGate(); })
+    .then(r =>{ if(r && r.v === "no" && demoteOK(r) && !gateActive) enterGate(); })
     .catch(()=>{});
 }
 function haptic(kind, style){
@@ -1477,22 +1638,50 @@ async function boot(){
     $("btn-open-bot").addEventListener("click", ()=>{ location.href = BOT_LINK; });
     return;
   }
+  show("loading");
+  /* v2.10 fast path: a fresh short-lived ?st= token (on the URL, or
+     remembered from the last verified entry) means the BOT verified this
+     user's membership LIVE — straight into the game, no roster copy on the
+     critical path. This is the button the bot re-issues right after
+     «بررسی دوبارهٔ عضویت», so the just-verified member lands in the game
+     INSTANTLY (the owner's report: the fresh button was the only thing
+     that worked — now it works with zero gate flash). A leaver pressing
+     an OLD button is still caught: the 1.4 s verdict race below gates
+     them before the game renders whenever a fresh «no» can answer (VPN
+     users: the direct check ~0.3 s; everyone else: the seconds-fresh
+     GitHub-API roster), and the continuous re-check lands the gate right
+     after otherwise. */
+  const stTok = readStToken(user.id);
+  if(stTok){
+    stVerified = { issued: stTok.iat };
+    rememberSt(stTok.raw);
+    const r = await Promise.race([
+      membershipVerdict(firstMembersFetch),
+      new Promise(res=>setTimeout(()=>res(null), 1400)),
+    ]);
+    if(r && r.v === "no" && demoteOK(r)){ enterGate(); return; }
+    membershipVerdict(firstMembersFetch)
+      .then(late =>{ if(late && late.v === "no" && demoteOK(late) && gameReady) enterGate(); })
+      .catch(()=>{});
+    await startGame();
+    return;
+  }
+  forgetSt();          /* an expired/legacy/mismatched token helps nobody */
   /* v2.4: membership verdict raced against a 1.8 s budget so members never
      wait on the roster fetch. Slow/failed checks fail OPEN (straight into
      the game, exactly like before) and the late answer still lands the gate
      softly if it comes back a definitive «no» — a slow network can never
      show a member a false gate. */
-  show("loading");
   const verdict = await Promise.race([
     membershipVerdict(firstMembersFetch),
     new Promise(res=>setTimeout(()=>res("slow"), 1800)),
   ]);
-  if(verdict === "no"){ enterGate(); return; }
-  if(verdict === "slow" || verdict === "unknown"){
+  if(verdict && verdict !== "slow" && verdict.v === "no"){ enterGate(); return; }
+  if(verdict === "slow" || !verdict || verdict.v !== "yes"){
     /* late answer: only land the gate once the game is fully up — never
        fight a startGame() that is still mid-boot (fetch/layout) */
     membershipVerdict(firstMembersFetch)
-      .then(late=>{ if(late === "no" && gameReady) enterGate(); })
+      .then(late=>{ if(late && late.v === "no" && gameReady) enterGate(); })
       .catch(()=>{});
   }
   await startGame();
