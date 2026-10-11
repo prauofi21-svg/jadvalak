@@ -464,7 +464,7 @@ function tgReady(){
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
    only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.11.3";
+const APP_V = "2026.10.11.4";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -485,17 +485,19 @@ let bootGate = Promise.resolve();
   }catch(e){}
 })();
 
-/* ================= channel membership (2026-10-11 v2.6) =================
-   The app gates itself against data/members.json — a roster the gateway
-   bot keeps publishing from REAL getChatMember checks. The gateway's
-   roster tick is now ~2.5 s (every known user every tick at the current
-   scale), so BOTH directions are near-real-time:
-     - a player who LEAVES the channel is landed on this gate screen
-       within seconds (quiet re-verification every ~7 s + on every return
-       to foreground, with progress flushed first);
-     - a player who JOINS from this screen is auto-admitted within ~5-10 s
-       (brisk 1.8 s polling picks up the roster flip the moment the
-       gateway commits it) — no tap, no second window, no bot message.
+/* ================= channel membership (2026-10-11 v2.7) =================
+   ZERO-LATENCY GATE — the browser itself runs a REAL getChatMember against
+   Telegram via a dedicated «sacrificial checker bot» (a channel admin with
+   can_post=FALSE, so a leaked token can only run read-only membership
+   queries; revocable via BotFather at any time). The direct answer
+   (~0.2-0.5 s) is authoritative in BOTH directions:
+     - a leaver can NEVER slip back in on a stale roster — every verdict is
+       a fresh API answer (start button, blue open button, in-game recheck);
+     - a fresh joiner is admitted the MOMENT Telegram itself knows it — no
+       roster lag, no waiting for the gateway sweep to notice.
+   Fallback (unchanged v2.6 behavior): if the direct call cannot run (blocked
+   network, revoked token, 429), the verdict falls back to data/members.json
+   — the roster the gateway bot publishes from its own getChatMember checks.
    v3 "members" — salted id hashes of CURRENT channel members
    v3 "left"    — salted hashes of KNOWN non-members (leavers!). A hash in
                   `left` is a hard block that the grace window can NOT
@@ -504,12 +506,16 @@ let bootGate = Promise.resolve();
                   users (in neither list) while the roster bootstraps.
    Failures never gate: a fetch that fails entirely fails OPEN, and the
    periodic re-checks keep retrying in the background.
-   The fetch is kicked off HERE so it runs in parallel with the version
-   self-heal wait — the verdict costs members ~zero extra boot time. */
+   The roster prefetch is kicked off HERE so it runs in parallel — the
+   fallback costs ~zero extra time. JK_MEMBERS_URL / JK_CHECKER_API are
+   test hooks for the offline browser suite (local mocks). */
 const CHANNEL_URL = "https://t.me/daily_sciences";
 const MEMBER_SALT = "2adeb51be375c1ab70e971569537f425";   /* == bot MEMBER_SALT */
 const MEMBERS_URL = window.JK_MEMBERS_URL ||
   "https://raw.githubusercontent.com/prauofi21-svg/jadvalak/main/data/members.json";
+const CHECKER_API = window.JK_CHECKER_API ||
+  "https://api.telegram.org/bot8886650266:AAFlpeBtEGlSWvV12EvbnMHfMvsswoxnH3U/getChatMember";
+const CHECKER_CHAT = "@daily_sciences";
 let gateActive = false, gateBound = false, gameStarted = false, gameReady = false;
 
 async function fetchMembers(){
@@ -545,9 +551,56 @@ async function memberHash(uid){
     return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,16);
   }catch(e){ return null; }
 }
+
+/* v2.7: one LIVE getChatMember round-trip. Semantics verified live
+   2026-10-11 against the real API: member/administrator/creator (+restricted
+   with is_member) => member; left/kicked => not a member; 400 with
+   PARTICIPANT_ID_INVALID / USER_ID_INVALID => DEFINITIVE non-member (the
+   API's modern answer for anyone not in the chat — NOT a checker failure);
+   any other 400 (chat not found…) / 401 / 429 / 5xx => the direct path is
+   unavailable -> null, and the caller falls back to the roster. Concurrent
+   callers share the in-flight request (poll loop + visibilitychange never
+   double-fire), but a settled answer is NEVER reused — every verdict is
+   fresh, which is the whole point of v2.7. */
+let _directInflight = null;
+function directCheck(uid){
+  if(_directInflight) return _directInflight;
+  const url = CHECKER_API + (CHECKER_API.indexOf("?") < 0 ? "?" : "&") +
+    "chat_id=" + encodeURIComponent(CHECKER_CHAT) + "&user_id=" + uid;
+  const p = new Promise(resolve=>{
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>{ try{ ctrl.abort(); }catch(e){} resolve(null); }, 1600);
+    fetch(url, {cache:"no-store", signal:ctrl.signal})
+      .then(r => r.json().catch(()=>null).then(body=>{
+        clearTimeout(t);
+        if(body && body.ok){
+          const res = body.result || {}, st = res.status || "";
+          resolve(st === "member" || st === "administrator" || st === "creator" ||
+                  (st === "restricted" && res.is_member) ? "yes" : "no");
+        }else if(body && body.error_code === 400){
+          const d = String(body.description || "");
+          resolve(d.indexOf("PARTICIPANT_ID_INVALID") >= 0 ||
+                  d.indexOf("USER_ID_INVALID") >= 0 ||
+                  d.indexOf("user not found") >= 0 ? "no" : null);
+        }else{
+          resolve(null);     /* 401 revoked / 429 / 5xx / odd body — roster path */
+        }
+      }))
+      .catch(()=>{ clearTimeout(t); resolve(null); });
+  });
+  _directInflight = p;
+  p.then(()=>{ if(_directInflight === p) _directInflight = null; });
+  return p;
+}
+
 async function membershipVerdict(prefetched){
   const uid = userId();
   if(!uid) return "unknown";                     /* no Telegram user -> no-tg path anyway */
+  /* v2.7: REAL-TIME verdict first — the direct answer beats any cached
+     roster in both directions and typically arrives in ~0.2-0.5 s. */
+  const d = await directCheck(uid);
+  if(d === "yes" || d === "no") return d;
+  /* fallback: the published roster (members.json) — same as v2.6 */
   const m = await (prefetched || fetchMembers());
   if(!m) return "unknown";                       /* fetch failed -> fail OPEN */
   const h = await memberHash(uid);
@@ -587,10 +640,10 @@ async function gatePollLoop(){
     const v = await membershipVerdict();
     if(v === "yes" || v === "grace"){ gateResolve(); return; }
     n++;
-    /* v2.6: with the gateway's 2.5 s roster tick a join is usually detected
-       within ~5-10 s; poll briskly (1.8 s, then 3.5 s) so the moment the
-       roster flips, this page opens the game by itself. A hidden WebView
-       backs off so we never drain the battery */
+    /* v2.7: each poll is a LIVE getChatMember — the moment Telegram itself
+       registers the join, the very next poll (~1.8 s cycle + ~0.3 s API)
+       opens the game by itself. A hidden WebView backs off so we never
+       drain the battery; a failed direct call degrades to the roster. */
     await new Promise(r=>setTimeout(r,
       document.hidden ? 6000 : (n < 12 ? 1800 : 3500)));
   }
