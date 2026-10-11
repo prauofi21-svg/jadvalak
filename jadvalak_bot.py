@@ -855,7 +855,11 @@ def gateway_enabled() -> bool:
     still admits players that are not in the roster yet (cold start)."""
     global _control_grace
     try:
-        r = requests.get(CONTROL_URL, headers=UA, timeout=(10, 20))
+        # cache-buster: raw.githubusercontent serves ~5 min of CDN cache on a
+        # fixed URL, which would delay kill-switch / grace edits
+        sep = "&" if "?" in CONTROL_URL else "?"
+        r = requests.get(f"{CONTROL_URL}{sep}t={int(time.time())}",
+                         headers=UA, timeout=(10, 20))
         if r.status_code == 200:
             try:
                 ctrl = json.loads(r.text or "{}")
