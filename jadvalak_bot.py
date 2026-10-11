@@ -25,6 +25,35 @@ Architecture (2026-10-08 v3 — "verification lives in the bot chat"):
     the channel works — e.g. the channel's posting bot), so the gate works
     from day one without extra BotFather/channel setup.
 
+Architecture (2026-10-11 v5 — "correct getChatMember semantics"):
+  - ROOT-CAUSE fix: Telegram now answers getChatMember with 400
+    PARTICIPANT_ID_INVALID for anyone who is NOT in the channel (verified
+    live: even real never-joined users get 400, not a 200/"left"). The old
+    code read every non-200 as "checker broken" -> None -> the scary ⛔
+    message, and (worse) the roster thread treated it as "check failed" so
+    a member who LEFT the channel stayed "member" in the roster FOREVER —
+    exactly the owner's bug: «کانال را ترک کرده اما جدولک هنوز باز می‌شود».
+    Now: 400 PARTICIPANT_ID_INVALID/USER_ID_INVALID -> definitive False;
+    400 chat-not-found -> that token can't see the channel (try next);
+    429 -> retry_after honoured; only true infra failure yields None, and
+    even then the chat falls back to the last roster verdict instead of
+    ever showing an error message.
+  - members.json v3 carries BOTH the member hashes and a `left` list
+    (salted hashes of known NON-members). The grace window now admits only
+    genuinely unknown users: a known leaver is hard-gated even while grace
+    is active — the owner's own test (leave -> open the app) blocks within
+    the sweep period.
+  - The sweep is adaptive: a full pass over every known user takes ~60 s
+    while the base is small, stretching to ~25 min as it grows, so
+    leave-detection stays "در لحظه" at the current scale. Verdict flips
+    force an immediate members.json commit (≤ 8 s) so a rejoining player
+    staring at the gate screen is auto-let-in within seconds.
+  - Cold start: the roster seeds itself with the channel's human admins
+    (getChatAdministrators), so the owner's accounts are covered from the
+    first minute after a roster reset.
+  - Bot-authored updates (from.is_bot) are ignored — a forwarded/re-sent
+    bot message once produced a bogus "user" id that failed every check.
+
 Architecture (2026-10-11 v4 — "live membership roster"):
   - The mini app gates itself against a PUBLIC roster file (data/members.json)
     that THIS bot maintains: a background thread keeps re-checking every
@@ -98,7 +127,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.11.1"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.11.2"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
@@ -125,8 +154,9 @@ RAW_BASE = ("https://raw.githubusercontent.com/"
             "prauofi21-svg/jadvalak/main/")
 HOT_INTERVAL = 6.0        # s between roster ticks
 HOT_PER_TICK = 25         # max hot (non-member/unknown) users re-checked per tick
-SWEEP_TICKS = 250         # ~ full sweep every 250 ticks (~25 min)
-MEMBERS_COMMIT_GAP = 15.0    # s, min gap between members.json commits
+SWEEP_TICKS = 250         # ~ full sweep every 250 ticks (~25 min) at scale
+MEMBERS_COMMIT_GAP = 8.0     # s, min gap between members.json commits (fast flips)
+LEFT_SEEN_DAYS = 60          # a hash stays in `left` while the user was seen recently
 ROSTER_COMMIT_GAP = 1200.0   # s, min gap between roster.enc commits (20 min)
 ROSTER_NEW_IDS_FLUSH = 8     # commit roster.enc early when this many new ids
 
@@ -336,43 +366,86 @@ def edit_message(chat_id: int, message_id: int, text: str, keyboard: dict | None
 #  Channel membership gate                                                      #
 # --------------------------------------------------------------------------- #
 
+MEMBER_STATUSES = ("creator", "administrator", "member", "restricted")
+# Telegram's getChatMember (verified live 2026-10-11) answers 400 with these
+# descriptions for anyone NOT in the channel — a DEFINITIVE non-member, not
+# a checker failure. Anything else (chat not found…) means THIS token cannot
+# see the chat and the next checker token must be tried.
+NOT_MEMBER_ERRORS = ("PARTICIPANT_ID_INVALID", "USER_ID_INVALID", "user not found")
+
+
+def _member_verdict_raw(uid: int) -> bool | None:
+    """getChatMember with CORRECT semantics:
+      200 + member-ish status          -> True
+      200 + left/kicked                -> False
+      400 PARTICIPANT_ID_INVALID & co  -> False   (definitively not a member)
+      400 chat not found / other       -> this token can't see the channel
+      429                             -> honour retry_after, retry once
+    Returns None ONLY when every token failed on infrastructure — callers
+    then fall back to the last roster verdict instead of erroring at the
+    user. Sticky _checker_idx keeps the working token first."""
+    global _checker_idx
+    for i in range(len(CHECKER_TOKENS)):
+        idx = (_checker_idx + i) % len(CHECKER_TOKENS)
+        token = CHECKER_TOKENS[idx]
+        for _attempt in range(2):          # one calm retry for transient blips
+            try:
+                r = requests.get(
+                    f"{TG_API}/bot{token}/getChatMember",
+                    params={"chat_id": GATE_CHAT_ID, "user_id": uid},
+                    headers=UA, timeout=(10, 20),
+                )
+                code = r.status_code
+                if code == 200:
+                    try:
+                        body = r.json()
+                    except ValueError:
+                        break              # non-JSON -> next token
+                    if body.get("ok"):
+                        status = (body.get("result") or {}).get("status", "")
+                        _checker_idx = idx
+                        return status in MEMBER_STATUSES
+                    break                 # 200 but not ok -> next token
+                if code == 400:
+                    desc = (r.text or "")[:200]
+                    if any(e in desc for e in NOT_MEMBER_ERRORS):
+                        _checker_idx = idx
+                        return False      # DEFINITIVE non-member
+                    log.warning("checker token #%d cannot check membership: %s %s",
+                                idx, code, desc[:120])
+                    break                # token can't see the chat -> next
+                if code == 429:
+                    try:
+                        wait_s = min(float(
+                            (r.json().get("parameters") or {}).get("retry_after", 3)), 5.0)
+                    except ValueError:
+                        wait_s = 3.0
+                    time.sleep(wait_s)
+                    continue              # retry the same token
+                # 5xx / anything else — brief pause, retry once, then next
+                log.warning("checker token #%d check oddity: %s %s",
+                            idx, code, (r.text or "")[:120])
+                time.sleep(0.4)
+                continue
+            except requests.RequestException as exc:
+                log.warning("checker token #%d request failed: %s", idx, exc)
+                time.sleep(0.4)
+                continue
+    return None
+
+
 def is_member(user_id: int) -> bool | None:
     """
-    True/False membership, or None if the check itself failed (no checker bot
-    has access to the channel). Result is cached for 90 seconds.
+    True/False membership, or None only on real infrastructure failure.
+    Result is cached for 90 seconds.
     """
     now = time.time()
     cached = _member_cache.get(user_id)
     if cached and now - cached[1] < 90:
         return cached[0]
-
-    global _checker_idx
-    result = None
-    for i in range(len(CHECKER_TOKENS)):
-        idx = (_checker_idx + i) % len(CHECKER_TOKENS)
-        token = CHECKER_TOKENS[idx]
-        try:
-            r = requests.get(
-                f"{TG_API}/bot{token}/getChatMember",
-                params={"chat_id": GATE_CHAT_ID, "user_id": user_id},
-                headers=UA, timeout=(15, 30),
-            )
-            if r.status_code == 200:
-                try:
-                    ok = r.json().get("ok")
-                except ValueError:
-                    ok = False
-                if ok:
-                    status = (r.json().get("result") or {}).get("status", "")
-                    _checker_idx = idx
-                    result = status in ("creator", "administrator", "member", "restricted")
-                    _member_cache[user_id] = (result, now)
-                    return result
-            # this token cannot see the channel — try the next one
-            log.warning("checker token #%d cannot check membership: %s %s",
-                        idx, r.status_code, r.text[:120])
-        except requests.RequestException as exc:
-            log.warning("checker token #%d request failed: %s", idx, exc)
+    result = _member_verdict_raw(user_id)
+    if result is not None:
+        _member_cache[user_id] = (result, now)
     return result
 
 
@@ -392,7 +465,9 @@ _roster_new_ids = 0
 _roster_last_save = 0.0
 _members_last_commit = 0.0
 _members_last_hashes: frozenset = frozenset()
+_members_last_left: frozenset = frozenset()
 _members_last_grace: int = -1
+_members_flip = False               # a verdict flipped -> force the next commit
 
 
 def member_hash(uid: int) -> str:
@@ -521,38 +596,35 @@ def roster_touch(uid: int, member: bool | None = None) -> None:
 
 
 def check_member_raw(uid: int) -> bool | None:
-    """Direct getChatMember (no 90 s cache) — used by the roster thread.
-    Also refreshes the shared cache so chat replies benefit."""
-    global _checker_idx
-    for i in range(len(CHECKER_TOKENS)):
-        idx = (_checker_idx + i) % len(CHECKER_TOKENS)
-        token = CHECKER_TOKENS[idx]
-        try:
-            r = requests.get(
-                f"{TG_API}/bot{token}/getChatMember",
-                params={"chat_id": GATE_CHAT_ID, "user_id": uid},
-                headers=UA, timeout=(15, 30),
-            )
-            if r.status_code == 200 and r.json().get("ok"):
-                status = (r.json().get("result") or {}).get("status", "")
-                _checker_idx = idx
-                res = status in ("creator", "administrator", "member", "restricted")
-                _member_cache[uid] = (res, time.time())
-                return res
-        except (requests.RequestException, ValueError):
-            continue
-    return None
+    """Direct verdict (no 90 s cache) — used by the roster thread. A False
+    here is what flips a leaver out of the member set."""
+    result = _member_verdict_raw(uid)
+    if result is not None:
+        _member_cache[uid] = (result, time.time())
+    return result
 
 
 def _roster_apply(uid: int, result: bool | None) -> None:
-    """Store a check result; None (check failed) keeps the previous value."""
+    """Store a check result; None (check failed) keeps the previous value.
+    A genuine flip (True<->False) flags members.json for an immediate
+    commit so the gate screen watching the roster updates within seconds."""
+    global _members_flip
     if result is None:
         return
     with _roster_lock:
         st = _roster.setdefault(uid, {"m": None, "ts": 0.0, "seen": 0.0})
+        if st.get("m") is not bool(result):
+            _members_flip = True
         st["m"] = bool(result)
         st["ts"] = time.time()
     _member_cache[uid] = (bool(result), time.time())
+
+
+def _sweep_ticks(n_users: int) -> int:
+    """Adaptive full-sweep length: ~60 s while the base is small (leave-
+    detection «در لحظه» at the current scale), stretching to the classic
+    ~25 min as the roster grows. Checks per tick stay ~2 either way."""
+    return max(10, min(SWEEP_TICKS, (n_users * 3) // int(HOT_INTERVAL) or 10))
 
 
 def _roster_next_batch() -> list:
@@ -570,7 +642,7 @@ def _roster_next_batch() -> list:
         window = hot[start:start + HOT_PER_TICK] + hot[:max(0, start + HOT_PER_TICK - len(hot))]
     else:
         window = hot
-    batch = max(2, -(-len(items) // SWEEP_TICKS))
+    batch = max(2, -(-len(items) // _sweep_ticks(len(items))))
     # sweep pool: users WITH a verdict (unknowns are already covered by the
     # hot window — giving them sweep slots would starve stale re-checks)
     known = [kv for kv in items if kv[1].get("m") is not None]
@@ -586,25 +658,67 @@ def _roster_next_batch() -> list:
     return out
 
 
+def _seed_admins() -> None:
+    """Cold-start seed: learn the channel's HUMAN admins (the owner's own
+    accounts) right away, so after a roster reset the gate can hard-block a
+    known leaver from the first minute instead of waiting for a chat
+    interaction. Best effort — never raises."""
+    global _checker_idx
+    for i in range(len(CHECKER_TOKENS)):
+        idx = (_checker_idx + i) % len(CHECKER_TOKENS)
+        token = CHECKER_TOKENS[idx]
+        try:
+            r = requests.get(
+                f"{TG_API}/bot{token}/getChatAdministrators",
+                params={"chat_id": GATE_CHAT_ID}, headers=UA, timeout=(10, 20),
+            )
+            if r.status_code == 200 and r.json().get("ok"):
+                _checker_idx = idx
+                seeded = 0
+                for a in (r.json().get("result") or []):
+                    u = a.get("user") or {}
+                    uid = u.get("id")
+                    if uid and not u.get("is_bot"):
+                        roster_touch(int(uid))
+                        seeded += 1
+                log.info("roster: seeded %d channel admins (cold start)", seeded)
+                return
+        except (requests.RequestException, ValueError):
+            continue
+    log.warning("roster: admin seeding failed (no checker could list admins)")
+
+
 def members_payload() -> dict:
+    """v3: members AND `left` (salted hashes of recently-seen known
+    non-members). The client hard-gates `left` hashes even while the grace
+    window is open — a leaver is a leaver, cold start or not."""
+    cutoff = time.time() - LEFT_SEEN_DAYS * 86400
     with _roster_lock:
-        hashes = sorted(member_hash(uid) for uid, st in _roster.items() if st.get("m"))
-    return {"v": 2, "n": len(hashes), "members": hashes,
+        members = sorted(member_hash(uid) for uid, st in _roster.items()
+                         if st.get("m"))
+        left = sorted(member_hash(uid) for uid, st in _roster.items()
+                      if st.get("m") is False
+                      and (st.get("seen") or 0) > cutoff)
+    return {"v": 3, "n": len(members), "members": members, "left": left,
             "grace_until": _control_grace,
             "updated": datetime.now(timezone.utc).isoformat()[:19] + "Z"}
 
 
 def members_commit(force: bool = False) -> bool:
-    """Publish data/members.json — when the member set OR the grace value
-    changed (or forced right after a chat verification). The client always
-    fetches it cache-busted from raw.githubusercontent, so a Pages rebuild is
-    never on the critical path."""
-    global _members_last_commit, _members_last_hashes, _members_last_grace
+    """Publish data/members.json — when the member set, the left set OR the
+    grace value changed (or forced right after a chat verification / a
+    verdict flip). The client always fetches it cache-busted from
+    raw.githubusercontent, so a Pages rebuild is never on the critical
+    path."""
+    global _members_last_commit, _members_last_hashes, _members_last_left
+    global _members_last_grace, _members_flip
     payload = members_payload()
     new_hashes = frozenset(payload["members"])
+    new_left = frozenset(payload.get("left") or [])
     now = time.time()
     if not force:
         if (new_hashes == _members_last_hashes
+                and new_left == _members_last_left
                 and payload["grace_until"] == _members_last_grace):
             return False
         if now - _members_last_commit < MEMBERS_COMMIT_GAP:
@@ -615,27 +729,36 @@ def members_commit(force: bool = False) -> bool:
     _members_last_commit = now
     if ok:
         _members_last_hashes = new_hashes
+        _members_last_left = new_left
         _members_last_grace = payload["grace_until"]
-        log.info("roster: members.json committed — %d members (grace=%d)",
-                 payload["n"], payload["grace_until"])
+        _members_flip = False
+        log.info("roster: members.json committed — %d members, %d left (grace=%d)",
+                 payload["n"], len(new_left), payload["grace_until"])
     return ok
 
 
 def roster_loop() -> None:                       # daemon thread — never dies
-    log.info("roster: thread alive (hot=%ss sweep≈%dm)",
-             int(HOT_INTERVAL), int(SWEEP_TICKS * HOT_INTERVAL / 60))
+    log.info("roster: thread alive (hot=%ss, sweep≈%ds at N=%d)",
+             int(HOT_INTERVAL), _sweep_ticks(len(_roster)) * int(HOT_INTERVAL),
+             len(_roster))
     first = True
     while True:
         try:
             if GATE_CHAT_ID and CHECKER_TOKENS:
                 if first:
-                    # cold start: make sure data/members.json EXISTS on main
-                    # (with the current grace window) even with an empty roster
+                    _seed_admins()      # cold start: know the owner's accounts
+                    # make sure data/members.json EXISTS on main (with the
+                    # current grace window) even with an empty roster
                     members_commit(force=True)
                     first = False
                 for uid in _roster_next_batch():
                     _roster_apply(uid, check_member_raw(uid))
-                members_commit()
+                # a verdict flip (member left / leaver rejoined) must reach
+                # the gate screen ASAP — force past the throttle
+                if _members_flip:
+                    members_commit(force=True)
+                else:
+                    members_commit()
             roster_save()
         except Exception as exc:                 # absolutely never crash the bot
             log.warning("roster tick crashed (ignored): %s", exc)
@@ -763,16 +886,23 @@ def kb_app(user_id: int) -> dict:
 def handle_start(chat_id: int, user_id: int, first: bool):
     count_user(user_id)
     member = is_member(user_id)
-    roster_touch(user_id, member)     # roster learns the id + fresh verdict
-    set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member is None:
-        # no checker bot has channel access — fail CLOSED with an explanation
-        log.error("membership check unavailable for user %s", user_id)
-        send(chat_id, (
-            "⛔ اتصال ربات به کانال @daily_sciences هنوز برقرار نشده است.\n"
-            "لطفاً چند دقیقه بعد دوباره تلاش کنید."
-        ))
-        return
+        time.sleep(1.2)               # one calm retry — transient blips only
+        member = is_member(user_id)
+    if member is None:
+        # checker genuinely unreachable: fall back to the last KNOWN roster
+        # verdict — a member keeps playing, everyone else gets the normal
+        # join flow. The user NEVER sees an infrastructure error message.
+        with _roster_lock:
+            member = (_roster.get(user_id) or {}).get("m")
+        if member is None:
+            member = False
+        roster_touch(user_id)          # seen — previous verdict untouched
+        log.warning("membership check unavailable for user %s (roster fallback: %s)",
+                    user_id, member)
+    else:
+        roster_touch(user_id, member)  # roster learns the id + fresh verdict
+    set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member:
         # verified HERE in the chat — only now does the mini app open.
         # Publish the roster right away so the button we are about to send
@@ -790,11 +920,20 @@ def handle_joined(cb) -> None:
     message_id = cb["message"]["message_id"]
     count_user(user_id)
     member = is_member(user_id)
-    roster_touch(user_id, member)     # roster learns the id + fresh verdict
-    set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member is None:
-        answer_cb(cb["id"], "بررسی عضویت موفق نبود؛ چند لحظه بعد دوباره بزن.")
-        return
+        time.sleep(1.2)               # one calm retry — transient blips only
+        member = is_member(user_id)
+    if member is None:
+        with _roster_lock:
+            member = (_roster.get(user_id) or {}).get("m")
+        if member is None:
+            member = False
+        roster_touch(user_id)
+        log.warning("membership check unavailable for user %s (roster fallback: %s)",
+                    user_id, member)
+    else:
+        roster_touch(user_id, member)  # roster learns the id + fresh verdict
+    set_menu_button(chat_id)          # reset any legacy web_app menu button
     if member:
         # verified HERE in the chat — only now does the mini app open.
         # Push the roster out immediately: the user may already be staring
@@ -821,6 +960,12 @@ def handle_update(upd: dict) -> None:
         user_id = user.get("id")
         if msg["chat"].get("type") != "private" or not user_id:
             return
+        if user.get("is_bot"):
+            # a re-sent/forwarded bot-authored message once arrived with
+            # from.id == OUR OWN bot id and failed every membership check
+            # (Telegram answers 400 PARTICIPANT_ID_INVALID for bot ids).
+            log.info("ignored bot-authored message from %s", user_id)
+            return
         roster_touch(user_id)           # any interaction heals the cold-start roster
         text = (msg.get("text") or "").strip()
         if text.startswith("/start"):
@@ -839,6 +984,10 @@ def handle_update(upd: dict) -> None:
             handle_start(chat_id, user_id, first=False)
     elif "callback_query" in upd:
         cb = upd["callback_query"]
+        if cb.get("from", {}).get("is_bot"):
+            log.info("ignored bot-authored callback from %s",
+                     cb.get("from", {}).get("id"))
+            return
         roster_touch(cb.get("from", {}).get("id"))   # seen (verdict comes in handler)
         if cb.get("data") == "joined":
             handle_joined(cb)
