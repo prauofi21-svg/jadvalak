@@ -49,6 +49,24 @@ Architecture (2026-10-11 v6 — "real-time membership detection"):
     before falling back to the same-origin Pages copy, so networks that
     block raw.githubusercontent don't pay the full serial timeout.
 
+Architecture (2026-10-11 v7 — "sacrificial checker bot, ZERO latency"):
+  - The owner created a dedicated checker bot (@Jadval_chekerbot, admin of
+    @daily_sciences with can_post=FALSE) and handed us its token. It now
+    serves BOTH paths: (a) server-side — the CHECKER_TOKEN secret points
+    at it (the previous checker, Agentxza, lost its admin rights and every
+    roster sweep check was failing with "chat not found", silently
+    freezing the roster); (b) browser-side — index.html v2026.10.11.4 calls
+    getChatMember DIRECTLY from the mini app, so every verdict (start
+    button, blue open button, gate poll, in-game recheck) is a fresh,
+    real-time Telegram answer with no roster lag at all.
+  - Browser-side semantics (verified live): 200 + member-ish status →
+    member; left/kicked → non-member; 400 PARTICIPANT_ID_INVALID →
+    DEFINITIVE non-member; anything else → fall back to the roster.
+  - The roster (members.json) remains the fallback tier for networks where
+    the direct call cannot run, so the fail-open/fail-closed behavior of
+    v2.5/v2.6 is fully preserved. Nothing in this file's runtime logic
+    changed for v7 — only the checker token (secret) did.
+
 Architecture (2026-10-11 v5 — "correct getChatMember semantics"):
   - ROOT-CAUSE fix: Telegram now answers getChatMember with 400
     PARTICIPANT_ID_INVALID for anyone who is NOT in the channel (verified
@@ -152,7 +170,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.11.3"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.11.4"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "525600"))  # 365 days: tokens live on button URLs so WebView-cached older app builds (which still validate them) never show their legacy gate to members
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
