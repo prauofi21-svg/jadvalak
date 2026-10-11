@@ -463,8 +463,16 @@ function tgReady(){
    URL's v param (not the code's APP_V) and REPLACING v in place on the
    reload makes the redirect idempotent — it can never loop, even for pages
    opened from old buttons that already carry an older ?v=. Future deploys
-   only need to bump BOTH APP_V here and version.json. */
-const APP_V = "2026.10.11.4";
+   only need to bump BOTH APP_V here and version.json.
+   v2.8 (2026-10-11): a SECOND, earlier layer now lives in
+   telegram-web-app.js — the «legacy bridge». It runs in EVERY historical
+   build (it is the one subresource all of them load before their own code)
+   and redirects even WebView-cached PRE-Oct-08 pages — which have no
+   self-heal of their own — onto the current versioned URL before their
+   legacy ?st= token gate can admit a channel-leaver. This inline self-heal
+   remains as the second layer for any page whose cached JS is itself
+   stale. */
+const APP_V = "2026.10.11.5";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -482,6 +490,23 @@ let bootGate = Promise.resolve();
       })
       .catch(()=>{});
     bootGate = Promise.race([check, timeout]);
+  }catch(e){}
+})();
+
+/* v2.8: purge the LEGACY token store. Pre-Oct-08 builds saved signed ?st=
+   tokens under jk:st:<uid> and admitted anyone holding a valid one for up
+   to 30 days with NO membership check. The telegram-web-app.js bridge
+   purges them in every build that loads the patched file; this second
+   purge guarantees they die the moment the user lands on a current page
+   even if the WebView served a stale copy of that script. */
+(function purgeLegacyTokens(){
+  try{
+    const dead = [];
+    for(let i=0; i<localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf("jk:st:") === 0) dead.push(k);
+    }
+    for(const k of dead){ try{ localStorage.removeItem(k); }catch(e){} }
   }catch(e){}
 })();
 
