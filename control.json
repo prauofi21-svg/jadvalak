@@ -1,1 +1,1 @@
-{"gateway": "on"}
+{"gateway": "on", "grace_until": 1791940693, "note": "72h cold-start transition for the v2.4 membership roster gate — remove after 2026-10-14"}
