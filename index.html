@@ -256,8 +256,6 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
 .btn:active{transform:scale(.95)}
 .btn.ghost{background:linear-gradient(180deg,var(--chip-bg1),var(--chip-bg2));color:var(--ink);border:1.5px solid var(--panel-bd);box-shadow:inset 0 1px 0 #ffffff17,0 0 12px var(--chip-glow);text-shadow:none}
 .btn.busy{pointer-events:none;filter:saturate(.6) brightness(.9)}
-.gate-wait{display:flex;align-items:center;gap:9px;font-size:.85rem;color:var(--sub);font-weight:700;margin-top:2px}
-.gatedot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);animation:dotPulse 1.6s ease-in-out infinite;flex:none}
 .spin{width:34px;height:34px;border-radius:50%;border:4px solid var(--panel-bd);border-top-color:var(--accent);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -335,14 +333,13 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
   <button class="btn" id="btn-open-bot">🤖 باز کردن ربات جدولک</button>
 </div>
 
-<!-- ============ channel-membership gate (v2.4) ============ -->
+<!-- ============ channel-membership gate (v2.11: minimal — logo, one
+     line, join button, bot fallback; detection runs silently) ============ -->
 <div id="gate" class="screen" hidden>
   <div class="logo">🧩</div>
-  <p>برای بازی، عضو کانال دانشنامهٔ علمی <b>@daily_sciences</b> شو. بعد از عضویت، همین صفحه خودکار وارد بازی می‌شود — نیازی به هیچ کار دیگری نیست.</p>
+  <p>برای بازی، عضو کانال دانشنامهٔ علمی <b>@daily_sciences</b> شو.</p>
   <button class="btn" id="btn-join">📢 عضویت در کانال</button>
-  <button class="btn ghost" id="btn-recheck">🔄 بررسی دوبارهٔ عضویت</button>
   <button class="btn ghost" id="btn-gate-bot">🤖 هنوز باز نشد؟ در چت ربات، دکمهٔ «بررسی دوبارهٔ عضویت» را بزن</button>
-  <p class="gate-wait" id="gate-wait"><i class="gatedot"></i>در حال بررسی خودکار عضویت…</p>
 </div>
 
 <!-- ============ loading / error ============ -->
@@ -422,7 +419,7 @@ body.theme-10{--bg1:#0d0517;--bg2:#170b24;--bgA:#381566d9;--bgB:#230d478c;--bgC:
       <div class="divider"></div>
       <button class="row" id="help-back"><span class="ic">↩️</span> بازگشت</button>
     </div>
-    <div class="ver">جدولک نسخه ۲٫۱۰</div>
+    <div class="ver">جدولک نسخه ۲٫۱۱</div>
   </div>
 </div>
 
@@ -478,7 +475,7 @@ function tgReady(){
    legacy ?st= token gate can admit a channel-leaver. This inline self-heal
    remains as the second layer for any page whose cached JS is itself
    stale. */
-const APP_V = "2026.10.12.2";
+const APP_V = "2026.10.12.3";
 let bootGate = Promise.resolve();
 (function selfHeal(){
   try{
@@ -567,8 +564,7 @@ function ghMembers(ms){
   /* v2.10 fresh source. 304 keeps the previous copy (and is FREE — it
      does not burn the 60/h unauthenticated quota, which matters behind
      shared CGNAT IPs); 403 = quota exhausted -> disable for 10 min;
-     everything else that fails -> null (raw/Pages still decide). The
-     manual re-check button clears _ghEtag to force one full 200. */
+     everything else that fails -> null (raw/Pages still decide). */
   if(Date.now() < _ghDeadUntil) return Promise.resolve(null);
   return new Promise(resolve=>{
     const ctrl = new AbortController();
@@ -794,7 +790,6 @@ function enterGate(){
   if(!gateBound){
     gateBound = true;
     $("btn-join").addEventListener("click", ()=>{ haptic("impact","light"); tgOpen(CHANNEL_URL); });
-    $("btn-recheck").addEventListener("click", ()=>{ haptic("impact","light"); manualRecheck(); });
     $("btn-gate-bot").addEventListener("click", ()=>{ tgOpen(BOT_CHECK_LINK); });
     /* returning from the channel preview -> re-check immediately */
     document.addEventListener("visibilitychange", ()=>{
@@ -803,28 +798,16 @@ function enterGate(){
   }
   gatePollLoop();
 }
+/* v2.11: the on-screen re-check button and its status line were REMOVED
+   (owner's final call): the page stays minimal and the detection that
+   remains is silent — gateCheckNow() on every return-to-foreground plus
+   the poll loop below. The visible way in for a just-verified member is
+   the bot chat button («بررسی دوبارهٔ عضویت»), whose fresh ?st= opens the
+   game instantly via the v2.10 fast path. */
 async function gateCheckNow(){
   const r = await membershipVerdict();
   if(r.v === "yes" && gateActive) gateResolve();
   return r;
-}
-/* v2.10: the button the owner asked for — the same action that saved them
-   in the field («بررسی دوبارهٔ عضویت» in the bot chat), without leaving the
-   mini app. Drops the ETag so the GitHub-API source does one FULL fresh
-   read (a real 200, not a 304) and reports the outcome honestly. */
-async function manualRecheck(){
-  const el = $("gate-wait");
-  if(el) el.textContent = "⏳ در حال بررسی عضویت…";
-  _ghEtag = null;                       /* bypass the 304 fast-path ONCE */
-  const r = await gateCheckNow();
-  if(!gateActive || !el) return;        /* resolved — gateResolve already toasted */
-  if(r && r.v === "no")
-    el.textContent = "❌ هنوز عضویت دیده نشد — عضو شو و چند لحظه بعد دوباره بزن";
-  else if(r && r.v === "unknown")
-    el.textContent = "⚠️ بررسی الان ممکن نشد — چند لحظه بعد دوباره بزن";
-  setTimeout(()=>{
-    if(gateActive && el) el.innerHTML = '<i class="gatedot"></i>در حال بررسی خودکار عضویت…';
-  }, 5000);
 }
 async function gatePollLoop(){
   let n = 0;
