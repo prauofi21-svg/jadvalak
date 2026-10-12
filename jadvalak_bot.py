@@ -198,7 +198,7 @@ CHECKER_TOKENS = [t.strip() for t in os.environ.get(
     "CHECKER_TOKENS", BOT_TOKEN).split(",") if t.strip()]
 GATE_CHAT_ID = os.environ.get("GATE_CHAT_ID", "").strip()
 APP_URL = os.environ.get("APP_URL", "").strip().rstrip("/")
-APP_V = "2026.10.12.3"   # deploy version — keep in sync with index.html APP_V and version.json
+APP_V = "2026.10.12.4"   # deploy version — keep in sync with index.html APP_V and version.json
 TOKEN_TTL_MIN = int(os.environ.get("TOKEN_TTL_MIN", "1440"))  # 1 day: the ?st= token is the bot's LIVE membership vouch. v2.10 made the client honor it again (instant entry after a chat verification), but ONLY in the new 4-segment uid.iat.exp.sig format whose lifetime is capped at ~24 h — the legacy 3-segment 30-day tokens on pre-Oct-8 welcome-message buttons are structurally rejected client-side, so that hole stays shut. The continuous in-app re-check still demotes on any FRESH «no».
 RUNTIME_MINUTES = float(os.environ.get("RUNTIME_MINUTES", "345"))
 START_OFFSET = int(os.environ.get("START_OFFSET", "-1"))
