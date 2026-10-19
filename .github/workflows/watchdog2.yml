@@ -8,6 +8,12 @@ name: Gateway watchdog
 #   2) If no gateway run is in progress/queued AND control.json is ON,
 #      dispatch a fresh one (offset=-1 bootstrap). This heals broken chains
 #      and GitHub hiccups.
+#   3) Cross-repo rescue: if the Meta Guardian of the nasa-apod-bot repo
+#      (the @daily_sciences channel pipelines) has been silent for > 2.5 h,
+#      re-dispatch it there — see the last step. On 2026-10-19 GitHub's
+#      cron scheduler silently dropped ALL of that repo's scheduled triggers
+#      for 17+ hours while THIS repo's scheduler kept firing, so a watchdog
+#      living here is a genuinely independent third engine for the channel.
 
 on:
   schedule:
@@ -98,3 +104,77 @@ jobs:
           echo "dispatch http $HTTP"
           cat /tmp/dispatch_resp.json || true
           [ "$HTTP" = "204" ] || exit 1
+
+      - name: Cross-repo rescue — keep the channel pipelines' Meta Guardian alive
+        # Engine 3 for @daily_sciences (prauofi21-svg/nasa-apod-bot): its
+        # Meta Guardian has its own two engines (a */30 cron on the workflow
+        # + a self-chaining workflow_dispatch loop). This step revives it if
+        # BOTH of those die: it checks the last meta-guardian run over there
+        # and re-dispatches it after > 2.5 h of silence (beats run ~every
+        # 27 min, so 2.5 h means both engines are gone). Uses the
+        # CROSS_DISPATCH_TOKEN PAT secret — delete that secret (or set
+        # "crossrescue": "off" in control.json) to disable the rescue.
+        # Failure-tolerant by design: this step ALWAYS exits 0 so it can
+        # never break the watchdog's own gateway duties.
+        env:
+          CROSS_TOKEN: ${{ secrets.CROSS_DISPATCH_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -u
+          if [ -z "$CROSS_TOKEN" ]; then
+            echo "no CROSS_DISPATCH_TOKEN secret — cross-repo rescue disabled"
+            exit 0
+          fi
+
+          XON=$(curl -s "https://raw.githubusercontent.com/$REPO/main/control.json" \
+            | python3 -c "
+          import json,sys
+          try:
+              d=json.load(sys.stdin)
+              print('off' if str(d.get('crossrescue','on')).lower()=='off' else 'on')
+          except Exception:
+              print('on')
+          ")
+          echo "cross-rescue control state: $XON"
+          if [ "$XON" = "off" ]; then
+            echo "cross-repo rescue disabled via control.json — not touching it"
+            exit 0
+          fi
+
+          STATUS=$(curl -s -H "Authorization: Bearer $CROSS_TOKEN" \
+            "https://api.github.com/repos/prauofi21-svg/nasa-apod-bot/actions/workflows/meta-guardian.yml/runs?per_page=5" \
+            | python3 -c "
+          import json, sys, datetime
+          try:
+              runs = json.load(sys.stdin).get('workflow_runs', [])
+          except Exception:
+              print('ERROR'); raise SystemExit
+          if any(r['status'] in ('in_progress', 'queued') for r in runs):
+              print('ACTIVE'); raise SystemExit
+          if not runs:
+              print('NONE'); raise SystemExit
+          now = datetime.datetime.now(datetime.timezone.utc)
+          c = datetime.datetime.strptime(runs[0]['created_at'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
+          print(int((now - c).total_seconds() // 60))
+          ") || echo ERROR
+          echo "meta-guardian over there: ${STATUS:-ERROR} (minutes since last run / ACTIVE / NONE / ERROR)"
+
+          case "$STATUS" in
+            ACTIVE|ERROR|"") echo "alive or unknown — not touching it"; exit 0 ;;
+            NONE) echo "meta-guardian has never run — dispatching the first beat" ;;
+            *)
+              if [ "$STATUS" -lt 150 ] 2>/dev/null; then
+                echo "meta-guardian ran recently (${STATUS} min ago) — nothing to do"
+                exit 0
+              fi
+              echo "meta-guardian silent for ${STATUS} min (> 150) — reviving it"
+              ;;
+          esac
+
+          HTTP=$(curl -s -o /tmp/cross_resp.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer $CROSS_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/prauofi21-svg/nasa-apod-bot/actions/workflows/meta-guardian.yml/dispatches" \
+            -d '{"ref":"main","inputs":{"beat_minutes":"26"}}')
+          echo "cross-repo rescue dispatch -> HTTP $HTTP $(cat /tmp/cross_resp.json 2>/dev/null || true)"
+          exit 0
