@@ -59,13 +59,19 @@ PUZZLES_PER_DAY = 10
 RESERVE_TARGET = 5
 CANDIDATES_PER_PUZZLE = 20
 # Words from this many most-recent DAYS-OF-USE block reuse (prompt + filter).
-# 2026-10-08 audit: at 400 words (~4.7 days at ~85 words/day) a whopping 85%
-# of recent days' words were RECYCLED old words — the sliding window simply
-# forgot them. Raised to 3000 ≈ 35 days: a full month between repeats, while
-# the LLM + the enlarged offline bank still have plenty of fresh vocabulary.
-# (The avoid list sent to the LLM prompt is capped separately to keep the
-# prompt token count sane — see AVOID_PROMPT_CAP.)
-USED_HISTORY = 3000
+# 2026-10-08 audit: at 400 words (~4.7 days) 85% of recent days' words were
+# RECYCLED old words — the sliding window simply forgot them.
+# 2026-10-24 word-crisis post-mortem: 3000 was the opposite extreme. At
+# ~67 words/day the accumulated history (2074 words) swallowed the WHOLE
+# 1763-word builtin bank — only 9 free words were left, so the offline
+# layer, the --selftest fallback and the bank rescue-merge all died at
+# once; with Gemini quota-dead (429 on every call) and Groq candidates
+# failing to interlock, 2026-10-24 shipped NO day file and the app replayed
+# 10-23's 7 puzzles. 900 ≈ 13 days without a repeat — far beyond the
+# 4.7-day recycling complaint, sustainable forever (a word re-enters the
+# pool as it slides out of the window), and it aligns exactly with
+# AVOID_PROMPT_CAP so the LLM prompt lists the whole blocked set.
+USED_HISTORY = 900
 AVOID_PROMPT_CAP = 900   # newest N avoid words actually listed in the prompt
 
 TOPICS = [
@@ -188,7 +194,11 @@ _MODELS: dict = {}        # provider name -> chosen primary model id
 # with Gemini first again (fresh quota window).
 _GEMINI_WASTE = 0.0       # seconds slept on gemini 429s (this process)
 _GEMINI_DEMOTED = False   # flipped once waste exceeds the budget
-_GEMINI_WASTE_BUDGET = 480.0
+# 2026-10-24: 480s of pure 429-sleeping per run while Gemini's daily quota
+# is dead (~8 wasted minutes before demotion). 180s demotes after ~4-6
+# rate-limited calls — enough to bridge a transient RPM burst, cheap when
+# the quota is gone for the day. (Groq carries the run either way.)
+_GEMINI_WASTE_BUDGET = 180.0
 
 
 def _providers() -> list:
@@ -1491,9 +1501,16 @@ def generate_day(date: str, use_llm: bool = True, keep_first: int = 0) -> tuple:
     # Belt and braces: whatever filtered path a word took, nothing that is
     # already in the avoid-history may ship. Offending puzzles are rebuilt
     # with the recycled words hard-blocked (2 passes max).
+    # 2026-10-24: kept puzzles (mid-day top-up) are EXEMPT — their words sit
+    # in the history only because backfill scanned THIS day's own file, not
+    # because they repeat an older day; rebuilding them would silently
+    # change puzzles the players have already solved.
+    kept_ids = {id(p) for p in kept}
     for audit_pass in range(2):
         offenders = []
         for p in puzzles:
+            if id(p) in kept_ids:
+                continue
             bad = [w["w"] for w in p["words"] if w["w"] in used_words]
             if bad:
                 offenders.append((p, bad))
@@ -1582,12 +1599,30 @@ def generate_and_save(date: str, use_llm: bool, force: bool = False,
     if day_file.exists() and not force:
         try:
             old = json.loads(day_file.read_text(encoding="utf-8"))
-            if len(old.get("puzzles", [])) >= 6:
+            n_old = len(old.get("puzzles", []))
+            if n_old >= PUZZLES_PER_DAY:
                 log.info("%s already generated (%d puzzles) — keeping it stable",
-                         date, len(old["puzzles"]))
+                         date, n_old)
                 return True
-            log.warning("%s has only %d puzzles — regenerating",
-                        date, len(old.get("puzzles", [])))
+            if n_old >= 6:
+                # 2026-10-23 shipped 7/10 and every later run then skipped the
+                # day as "already generated" — a short day stayed short
+                # FOREVER. Short-but-playable days are now topped UP instead:
+                # the existing puzzles stay byte-identical (keep_first), only
+                # the missing ones are generated. Past days are history —
+                # players have moved on — and are never rewritten.
+                if date >= tehran_today():
+                    log.warning("%s has only %d puzzles — topping up "
+                                "(keep_first=%d)", date, n_old, n_old)
+                    force = True
+                    keep_first = max(keep_first, n_old)
+                else:
+                    log.info("%s is a past short day (%d puzzles) — leaving "
+                             "it untouched", date, n_old)
+                    return True
+            else:
+                log.warning("%s has only %d puzzles — regenerating",
+                            date, n_old)
         except (OSError, ValueError):
             log.warning("existing %s unreadable — regenerating", day_file)
 
