@@ -189,23 +189,29 @@ _MODELS: dict = {}        # provider name -> chosen primary model id
 # generator fires more calls per minute than the quota allows. Each fully
 # rate-limited call burns ~140s in 429 retries BEFORE falling back to Groq —
 # with ~50 calls a run that could exceed the 90-minute workflow timeout.
-# After 8 minutes of cumulative 429 waiting this process demotes Gemini to
-# the fallback slot and finishes at Groq speed; the NEXT scheduled run starts
-# with Gemini first again (fresh quota window).
+# Rate-limit intelligence (2026-10-24): 429s with a minutes-long retry-after
+# are treated as a QUOTA window — the provider is demoted for the rest of
+# the run immediately instead of burning the job's minutes on sleeps; the
+# next scheduled run starts fresh (quota windows are hours long).
 _GEMINI_WASTE = 0.0       # seconds slept on gemini 429s (this process)
 _GEMINI_DEMOTED = False   # flipped once waste exceeds the budget
+_GROQ_QUOTA_DEAD = False  # flipped on a minutes-long retry-after from groq
 # 2026-10-24: 480s of pure 429-sleeping per run while Gemini's daily quota
 # is dead (~8 wasted minutes before demotion). 180s demotes after ~4-6
 # rate-limited calls — enough to bridge a transient RPM burst, cheap when
 # the quota is gone for the day. (Groq carries the run either way.)
 _GEMINI_WASTE_BUDGET = 180.0
+# Hard stop: after 10 cumulative minutes of gemini 429-sleeping the
+# provider is dropped from the rotation entirely for the rest of the run
+# (the per-call ladder above caps it at ~180s anyway — belt and braces).
+_GEMINI_HARD_STOP = 600.0
 
 
 def _providers() -> list:
     """Ordered providers: Gemini first (when configured), Groq as fallback —
     unless the rate-limit breaker has demoted Gemini for this process."""
     gem = None
-    if GEMINI_API_KEY:
+    if GEMINI_API_KEY and _GEMINI_WASTE <= _GEMINI_HARD_STOP:
         gem = {
             "name": "gemini", "base": GEMINI_BASE, "key": GEMINI_API_KEY,
             "preferred": GEMINI_MODELS,
@@ -346,9 +352,19 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
                     except (TypeError, ValueError):
                         pass
                     last_err = "HTTP 429"
+                    sleep_for = min(wait, 45)
+                    # A retry-after of minutes means a QUOTA window (Groq's
+                    # free tier sends 1200-1900s when the token budget is
+                    # gone), not a per-minute blip. Waiting is pointless
+                    # inside a 90-minute job — 2026-10-24 post-mortem: the
+                    # heal run died at the 90-min timeout with 8/10 puzzles
+                    # done and ~70% of the wall time burnt on 429 sleeps.
+                    quota_dead = wait > 120
                     if prov["name"] == "gemini":
                         global _GEMINI_WASTE, _GEMINI_DEMOTED
-                        _GEMINI_WASTE += wait
+                        _GEMINI_WASTE += sleep_for
+                        if quota_dead:
+                            _GEMINI_DEMOTED = True
                         if (_GEMINI_WASTE > _GEMINI_WASTE_BUDGET
                                 and not _GEMINI_DEMOTED and len(provs) > 1):
                             _GEMINI_DEMOTED = True
@@ -357,9 +373,32 @@ def ask_llm(system: str, user: str, max_tokens: int = 2048, temperature: float =
                                 "this run (%.0fs wasted on 429s) — groq "
                                 "primary now; next scheduled run retries "
                                 "gemini first", _GEMINI_WASTE)
+                    elif prov["name"] == "groq":
+                        global _GROQ_QUOTA_DEAD
+                        if quota_dead:
+                            _GROQ_QUOTA_DEAD = True
+                            log.warning(
+                                "groq quota window (retry-after ~%ds) — last "
+                                "resort for the rest of this run; the builtin "
+                                "bank covers any shortfall instantly", wait)
+                    # A quota-dead provider must not burn the job's minutes —
+                    # skip its remaining attempts and jump to the fallback
+                    # (or straight to None; the builtin bank builds the
+                    # puzzle instantly either way). No len(provs)>1 guard:
+                    # retrying a minutes-long quota window is ALWAYS futile,
+                    # even when this is the only configured provider.
+                    if ((prov["name"] == "groq" and _GROQ_QUOTA_DEAD)
+                            or (prov["name"] == "gemini"
+                                and quota_dead and _GEMINI_DEMOTED)
+                            or (prov["name"] == "gemini"
+                                and _GEMINI_WASTE > _GEMINI_WASTE_BUDGET)):
+                        log.warning("rate-limited (%s, retry-after %ds) — "
+                                    "provider dead for this run, moving on",
+                                    prov["name"], wait)
+                        break
                     log.warning("rate-limited (%s) — sleeping %ds (attempt %d/%d)",
-                                prov["name"], wait, attempt, attempts)
-                    time.sleep(min(wait, 45))
+                                prov["name"], sleep_for, attempt, attempts)
+                    time.sleep(sleep_for)
                     continue
                 else:
                     last_err = f"HTTP {r.status_code}: {r.text[:180]}"
